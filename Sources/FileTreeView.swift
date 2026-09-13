@@ -28,6 +28,13 @@ struct FileTreeView: View {
         isFocused = true
     }
 
+    /// 이 트리가 활성이 됐으면 키보드 포커스를 가져온다(Tab 등 스토어 쪽 전환용).
+    private func claimFocusIfActive() {
+        DispatchQueue.main.async {
+            if hasTreeFocus && !isFocused { isFocused = true }
+        }
+    }
+
     /// 드롭 대상 노드가 실제로 받게 될 폴더 URL(폴더면 자신, 파일이면 부모).
     private func dropFolder(for node: FileNode) -> URL {
         node.isDirectory ? node.url : node.url.deletingLastPathComponent()
@@ -213,10 +220,13 @@ struct FileTreeView: View {
         .focusable()
         .focused($isFocused)
         .focusEffectDisabled()
-        // 키보드 포커스는 활성 트리 하나만 잡는다. 둘 다 잡으려 하면 서로 뺏으며 깜빡인다.
+        // 키보드 포커스는 활성이 된 트리만 가져온다. 비활성이 된 트리가 같은 순간에 `false`를 쓰면
+        // 처리 순서에 따라 방금 넘어간 포커스까지 지워져, Tab으로 옮긴 두 번째 트리에서 화살표가
+        // 먹지 않았다. 포커스를 가져가면 이전 트리는 저절로 놓으므로 `true`만 쓰고, 두 트리의 상태
+        // 변경이 끝난 다음 틱에 쓴다.
         .onAppear { if hasTreeFocus { isFocused = true } }
-        .onChange(of: store.focus) { _, _ in isFocused = hasTreeFocus }
-        .onChange(of: store.activePaneIndex) { _, _ in isFocused = hasTreeFocus }
+        .onChange(of: store.focus) { _, _ in claimFocusIfActive() }
+        .onChange(of: store.activePaneIndex) { _, _ in claimFocusIfActive() }
         .onKeyPress { press in handleKey(press) }
         // 이름 변경 오류·삭제 확인 창은 트리가 둘이어도 한 번만 떠야 하므로 ContentView가 띄운다.
     }
@@ -302,7 +312,9 @@ struct FileTreeView: View {
 
     private func handleKey(_ press: KeyPress) -> KeyPress.Result {
         // 이름 편집 중에는 트리 키 탐색을 막는다(TextField가 입력을 받음).
-        guard hasTreeFocus, store.renamingURL == nil else { return .ignored }
+        // 이 뷰가 활성 트리인지는 따지지 않는다. 스토어의 트리 동작은 늘 활성 트리를 대상으로 하므로,
+        // 포커스 전환이 한 박자 늦어 키가 반대편 트리 뷰로 들어와도 활성 트리가 움직인다.
+        guard store.focus == .tree, store.renamingURL == nil else { return .ignored }
         // 키보드로 움직일 때는 커서가 화면 밖으로 나갈 수 있으므로 스크롤이 따라와야 한다.
         // (직전 클릭이 커서를 옮기지 않았다면 억제 플래그가 남아 있을 수 있다.)
         suppressCursorScroll = false
@@ -317,7 +329,7 @@ struct FileTreeView: View {
         case KeyEquivalent("\u{F746}"):    store.toggleMarkAndAdvance();  return .handled // Insert
         // Escape: 다중 선택 전체 해제(선택이 있을 때만 소비).
         case .escape:
-            if !pane.markedURLs.isEmpty { store.clearMarks(); return .handled }
+            if store.markedCount > 0 { store.clearMarks(); return .handled }
             return .ignored
         default:          return .ignored
         }
