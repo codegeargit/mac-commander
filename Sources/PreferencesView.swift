@@ -17,10 +17,22 @@ struct PreferencesView: View {
                 }
             }
 
-            Picker(loc.string(.colorTheme), selection: $theme.theme) {
-                ForEach(AppTheme.allCases) { t in
-                    Text(t.displayName(loc.language)).tag(t)
+            // 선택값은 실제로 그려지는 테마에 묶는다. 키가 무효가 돼 후원자 테마가 목록에서 빠져도
+            // 피커가 없는 값을 가리키지 않게 하기 위해서다. 고르면 저장값(theme)을 바꾼다.
+            Picker(loc.string(.colorTheme), selection: Binding(
+                get: { theme.effectiveTheme },
+                set: { theme.theme = $0 }
+            )) {
+                ForEach(theme.selectableThemes) { t in
+                    Text(t.isSupporterOnly ? "💖 \(t.displayName(loc.language))" : t.displayName(loc.language))
+                        .tag(t)
                 }
+            }
+            // 후원자 테마 안내 — 키를 받을 수 있는 빌드에서, 아직 키가 없을 때만.
+            if showsSupporterKeyUI && !theme.supporterUnlocked {
+                Text(loc.string(.supporterThemesHint))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             accessSection

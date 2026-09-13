@@ -224,6 +224,9 @@ enum L10n {
     case licenseStatusNone   // 상태: 후원자 키 없음
     case supporterKeyGet     // 후원자 키 결제(체크아웃) 링크
     case supporterKeyHint    // 후원자 키 섹션 안내 문구
+    case supporterThemesHint // 테마 선택 아래: 후원자 테마 안내
+    case aboutSupporterThanks // About 패널: 후원자 감사 인사
+    case aboutSupportersTitle // About 패널: 후원자 크레딧 제목
     case supportMenu         // 도움말 메뉴: 후원하기
     case supportSection      // 후원 섹션 제목
     case githubSponsors      // GitHub Sponsors 링크 라벨
@@ -512,8 +515,13 @@ enum L10n {
         case .licenseStatusNone: ko = "후원자 키 없음"; en = "No supporter key"
         case .supporterKeyGet:  ko = "후원자 키 받기"; en = "Get a Supporter Key"
         case .supporterKeyHint:
-            ko = "후원자 키가 없어도 모든 기능을 쓸 수 있습니다. 후원자 혜택은 차례로 추가됩니다."
-            en = "Every feature works without a supporter key. Supporter perks will be added over time."
+            ko = "후원자 키가 없어도 모든 기능을 쓸 수 있습니다. 키가 있으면 후원자 테마 3종과 후원자 배지가 열립니다."
+            en = "Every feature works without a supporter key. A key unlocks three supporter themes and a supporter badge."
+        case .supporterThemesHint:
+            ko = "후원자 키가 있으면 테마 3종(Nord · Dracula · Solarized Light)이 더 열립니다."
+            en = "A supporter key unlocks three more themes (Nord · Dracula · Solarized Light)."
+        case .aboutSupporterThanks: ko = "💖 후원해 주셔서 고맙습니다"; en = "💖 Thank you for supporting Mac Commander"
+        case .aboutSupportersTitle: ko = "후원해 주신 분들"; en = "Supporters"
         case .supportMenu:      ko = "Mac Commander 후원하기…"; en = "Sponsor Mac Commander…"
         case .supportSection:   ko = "후원"; en = "Support"
         case .githubSponsors:   ko = "💖 GitHub Sponsors로 후원하기"; en = "💖 Sponsor on GitHub"

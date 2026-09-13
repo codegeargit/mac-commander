@@ -190,6 +190,20 @@ struct MacCommanderApp: App {
                 string: loc.string(item.label),
                 attributes: baseAttrs.merging([.link: item.url]) { _, new in new }))
         }
+        // 후원자 배지: 이 기기에 유효한 후원자 키가 있으면 감사 인사를 붙인다.
+        if license.isSupporter {
+            credits.append(NSAttributedString(
+                string: "\n\n\(loc.string(.aboutSupporterThanks))",
+                attributes: baseAttrs.merging([.foregroundColor: NSColor.systemPink]) { _, new in new }))
+        }
+        // 후원자 크레딧: 이름 공개에 동의한 후원자 목록(Supporters.swift). 비어 있으면 생략.
+        if !Supporters.names.isEmpty {
+            credits.append(NSAttributedString(
+                string: "\n\n\(loc.string(.aboutSupportersTitle))\n",
+                attributes: baseAttrs.merging([.font: NSFont.boldSystemFont(ofSize: 11)]) { _, new in new }))
+            credits.append(NSAttributedString(
+                string: Supporters.names.joined(separator: " · "), attributes: baseAttrs))
+        }
         // 가운데 정렬(표준 패널의 다른 텍스트와 결을 맞춤).
         let center = NSMutableParagraphStyle()
         center.alignment = .center

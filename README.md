@@ -24,7 +24,7 @@ Mac Commander는 모든 기능이 무료입니다. 도움이 되었다면 후원
 - 💖 [GitHub Sponsors](https://github.com/sponsors/codegeargit) — 월 정기 · 일회성
 - ☕ [Buy Me a Coffee](https://buymeacoffee.com/codegear)
 
-후원자 키(앱 안 후원자 혜택)는 준비 중입니다.
+후원자 키가 있으면 기능은 그대로 두고 **후원자 테마 3종**(Nord · Dracula · Solarized Light)과 **후원자 배지**가 열립니다. 키 발급은 준비 중입니다. 이름 공개에 동의한 후원자는 앱 정보(About) 창에 이름을 올립니다.
 
 ## 직접 빌드하기
 

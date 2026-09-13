@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// 색상 테마 종류.
 enum AppTheme: String, CaseIterable, Identifiable {
@@ -6,8 +7,22 @@ enum AppTheme: String, CaseIterable, Identifiable {
     case dark        // 표준 다크(중립)
     case light       // 라이트
     case system      // macOS 설정에 따라 dark/light 자동
+    // 후원자 테마 — 후원자 키가 있을 때만 고를 수 있다.
+    case nord            // 차분한 청회색 다크
+    case dracula         // 보라 강조 다크
+    case solarizedLight  // 따뜻한 종이색 라이트
 
     var id: String { rawValue }
+
+    /// 후원자 키가 있어야 고를 수 있는 테마인지.
+    ///
+    /// 후원자 혜택은 기능이 아니라 꾸미기만 연다. 기본 테마 넷으로 앱은 이미 온전하다.
+    var isSupporterOnly: Bool {
+        switch self {
+        case .nord, .dracula, .solarizedLight: return true
+        case .default, .dark, .light, .system: return false
+        }
+    }
 
     func displayName(_ lang: AppLanguage) -> String {
         switch self {
@@ -15,6 +30,9 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .dark:    return lang == .korean ? "다크" : "Dark"
         case .light:   return lang == .korean ? "라이트" : "Light"
         case .system:  return lang == .korean ? "시스템" : "System"
+        case .nord:           return "Nord"
+        case .dracula:        return "Dracula"
+        case .solarizedLight: return "Solarized Light"
         }
     }
 }
@@ -99,6 +117,70 @@ struct ColorSet {
         codeInlineBackground: Color(hex: 0xF5F6F8),  // 흰 배경에 가깝게 — 아주 은은한 음영
         textWarning: Color(hex: 0xC9252D)
     )
+
+    // MARK: 후원자 테마
+    // 널리 쓰이는 공개 팔레트를 바탕으로, 이 앱의 역할(패널·헤더·선택)에 맞춰 배치했다.
+    // 작은 글씨(흐린 텍스트·폴더명)는 원본 팔레트보다 한 단계 밝거나 진하게 잡아 대비를 확보한다.
+
+    /// Nord — 차분한 청회색 다크.
+    static let nord = ColorSet(
+        panelBackground: Color(hex: 0x3B4252),
+        viewerBackground: Color(hex: 0x2E3440),
+        headerBackground: Color(hex: 0x434C5E),
+        headerBackgroundInactive: Color(hex: 0x353B48),
+        accent: Color(hex: 0x88C0D0),
+        accentDim: Color(hex: 0x5E81AC),
+        textPrimary: Color(hex: 0xD8DEE9),
+        textHeading: Color(hex: 0xECEFF4),
+        textFolder: Color(hex: 0x8FBCBB),
+        textMuted: Color(hex: 0x8A96AD),
+        selectBackground: Color(hex: 0x88C0D0),
+        selectForeground: Color(hex: 0x2E3440),
+        divider: Color(hex: 0x4C566A),
+        codeBlockBackground: Color(hex: 0x353B48),
+        codeInlineBackground: Color(hex: 0x3B4252),
+        textWarning: Color(hex: 0xD57780)
+    )
+
+    /// Dracula — 보라 강조 다크.
+    static let dracula = ColorSet(
+        panelBackground: Color(hex: 0x21222C),
+        viewerBackground: Color(hex: 0x282A36),
+        headerBackground: Color(hex: 0x44475A),
+        headerBackgroundInactive: Color(hex: 0x343746),
+        accent: Color(hex: 0xBD93F9),
+        accentDim: Color(hex: 0x6272A4),
+        textPrimary: Color(hex: 0xE6E6E0),   // 원본 전경(#F8F8F2)보다 살짝 낮춰 글자 번짐을 줄인다
+        textHeading: Color(hex: 0xF8F8F2),
+        textFolder: Color(hex: 0x8BE9FD),
+        textMuted: Color(hex: 0x8390BF),
+        selectBackground: Color(hex: 0xBD93F9),
+        selectForeground: Color(hex: 0x282A36),
+        divider: Color(hex: 0x3A3D4D),
+        codeBlockBackground: Color(hex: 0x21222C),
+        codeInlineBackground: Color(hex: 0x343746),
+        textWarning: Color(hex: 0xFF6E6E)
+    )
+
+    /// Solarized Light — 따뜻한 종이색 라이트.
+    static let solarizedLight = ColorSet(
+        panelBackground: Color(hex: 0xEEE8D5),
+        viewerBackground: Color(hex: 0xFDF6E3),
+        headerBackground: Color(hex: 0xE4DCC4),
+        headerBackgroundInactive: Color(hex: 0xEAE3CD),
+        accent: Color(hex: 0x268BD2),
+        accentDim: Color(hex: 0x7FB0D8),
+        textPrimary: Color(hex: 0x586E75),   // 원본 본문색(#657B83)보다 한 단계 진하게
+        textHeading: Color(hex: 0x073642),
+        textFolder: Color(hex: 0x187069),
+        textMuted: Color(hex: 0x6E7C7D),
+        selectBackground: Color(hex: 0x268BD2),
+        selectForeground: Color(hex: 0xFDF6E3),
+        divider: Color(hex: 0xDDD6C1),
+        codeBlockBackground: Color(hex: 0xEEE8D5),
+        codeInlineBackground: Color(hex: 0xF2ECDA),
+        textWarning: Color(hex: 0xDC322F)
+    )
 }
 
 /// 앱 전역 테마 상태. @Published로 변경 시 뷰가 즉시 갱신된다.
@@ -106,11 +188,14 @@ struct ColorSet {
 final class ThemeManager: ObservableObject {
     static let shared = ThemeManager()
 
+    /// 사용자가 고른 테마(저장값). 후원자 테마를 골랐더라도 키가 없으면 `effectiveTheme`은 기본으로 떨어진다.
     @Published var theme: AppTheme {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: "app.theme") }
     }
     /// system 테마일 때 현재 시스템이 다크인지(뷰에서 갱신해 준다).
     @Published var systemIsDark: Bool = true
+    /// 후원자 테마를 쓸 수 있는지. `LicenseManager.isSupporter`를 따라간다.
+    @Published private(set) var supporterUnlocked: Bool = false
 
     private init() {
         if let saved = UserDefaults.standard.string(forKey: "app.theme"),
@@ -119,33 +204,52 @@ final class ThemeManager: ObservableObject {
         } else {
             theme = .default
         }
+        LicenseManager.shared.$isSupporter
+            .removeDuplicates()
+            .assign(to: &$supporterUnlocked)
+    }
+
+    /// 실제로 그릴 테마.
+    ///
+    /// 키가 무효가 되면(환불·해제·만료) 후원자 테마 대신 기본 테마로 그린다. 저장값(`theme`)은
+    /// 지우지 않으므로, 오프라인 유예가 끝났다가 다시 검증되면 고른 테마로 돌아온다.
+    var effectiveTheme: AppTheme {
+        theme.isSupporterOnly && !supporterUnlocked ? .default : theme
+    }
+
+    /// 테마 선택 목록. 후원자 테마는 키가 있을 때만 보인다.
+    var selectableThemes: [AppTheme] {
+        AppTheme.allCases.filter { !$0.isSupporterOnly || supporterUnlocked }
     }
 
     /// 현재 활성 색 모음.
     var colors: ColorSet {
-        switch theme {
+        switch effectiveTheme {
         case .default: return .retro
         case .dark:    return .dark
         case .light:   return .light
         case .system:  return systemIsDark ? .dark : .light
+        case .nord:           return .nord
+        case .dracula:        return .dracula
+        case .solarizedLight: return .solarizedLight
         }
     }
 
     /// 현재 테마가 어두운 계열인지(mermaid 등 WebView 렌더러의 테마 선택에 사용).
     var isDark: Bool {
-        switch theme {
-        case .default, .dark: return true
-        case .light:          return false
-        case .system:         return systemIsDark
+        switch effectiveTheme {
+        case .default, .dark, .nord, .dracula: return true
+        case .light, .solarizedLight:          return false
+        case .system:                          return systemIsDark
         }
     }
 
     /// SwiftUI 창에 줄 색 구성(nil=시스템 따름).
     var preferredColorScheme: ColorScheme? {
-        switch theme {
-        case .default, .dark: return .dark
-        case .light:          return .light
-        case .system:         return nil
+        switch effectiveTheme {
+        case .default, .dark, .nord, .dracula: return .dark
+        case .light, .solarizedLight:          return .light
+        case .system:                          return nil
         }
     }
 
@@ -154,8 +258,8 @@ final class ThemeManager: ObservableObject {
     /// 뷰어 배경/본문색과 톤을 맞춰 터미널이 앱에 자연스럽게 녹아들게 한다.
     var terminalColors: (background: NSColor, foreground: NSColor, cursor: NSColor) {
         let resolved: AppTheme = {
-            if case .system = theme { return systemIsDark ? .dark : .light }
-            return theme
+            if case .system = effectiveTheme { return systemIsDark ? .dark : .light }
+            return effectiveTheme
         }()
         switch resolved {
         case .default:
@@ -166,6 +270,12 @@ final class ThemeManager: ObservableObject {
             return (NSColor(hex: 0xFFFFFF), NSColor(hex: 0x1C1C1E), NSColor(hex: 0x0A84FF))
         case .system:
             return (NSColor(hex: 0x171717), NSColor(hex: 0xEDEDED), NSColor(hex: 0x4AA3FF))
+        case .nord:
+            return (NSColor(hex: 0x2E3440), NSColor(hex: 0xD8DEE9), NSColor(hex: 0x88C0D0))
+        case .dracula:
+            return (NSColor(hex: 0x282A36), NSColor(hex: 0xF8F8F2), NSColor(hex: 0xBD93F9))
+        case .solarizedLight:
+            return (NSColor(hex: 0xFDF6E3), NSColor(hex: 0x586E75), NSColor(hex: 0x268BD2))
         }
     }
 }

@@ -55,6 +55,9 @@ final class LicenseManager: ObservableObject {
     init(provider: LicenseProvider? = nil) {
         self.provider = provider ?? Self.defaultProvider
         self.activeKey = Self.readKeyFromKeychain()
+        // 창이 뜨기 전에 잠정 상태를 정해 둔다. `restore()`(창의 onAppear)까지 기다리면
+        // 후원자 테마를 쓰는 사람의 첫 화면이 기본 테마로 한 번 번쩍인다.
+        self.isSupporter = activeKey != nil && withinOfflineGrace()
     }
 
     /// 프록시 주소가 실제 값으로 채워져 있으면 Creem을 쓰고, 아니면 개발용 목으로 남는다.

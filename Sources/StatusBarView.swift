@@ -7,6 +7,7 @@ struct StatusBarView: View {
     @EnvironmentObject private var store: WorkspaceStore
     @EnvironmentObject private var loc: LocalizationManager
     @EnvironmentObject private var theme: ThemeManager
+    @EnvironmentObject private var license: LicenseManager
 
     /// 현재 표시 중인 주 로컬 IPv4 주소(없으면 nil).
     @State private var localIP: String?
@@ -30,6 +31,14 @@ struct StatusBarView: View {
                 Text(loc.string(.statusItemsCount(store.currentFolderItemCount)))
                     .lineLimit(1)
                     .fixedSize()
+            }
+
+            // 맨 오른쪽: 후원자 배지. 유효한 후원자 키가 있을 때만.
+            if license.isSupporter {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.pink)
+                    .help(loc.string(.licenseStatusActive))
             }
         }
         .font(.system(size: 11))
