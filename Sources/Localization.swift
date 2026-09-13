@@ -149,6 +149,7 @@ enum L10n {
     case fkeyNewFolder // F7
     case fkeyDelete    // F8
     case fkeyMove      // 듀얼 모드 F6(하단 F키 바의 짧은 이름)
+    case fkeySameLocation  // 하단 F키 바: 반대편 트리에 같은 위치 열기(⌥⌘→/⌥⌘←)
     case menuSameLocationRight  // ⌥⌘→ 왼쪽 트리 커서 위치를 오른쪽 트리에서 열기
     case menuSameLocationLeft   // ⌥⌘← 오른쪽 트리 커서 위치를 왼쪽 트리에서 열기
     case fkeyCopyToOther  // 듀얼 모드 F5: 반대편 트리로 복사
@@ -467,6 +468,7 @@ enum L10n {
         case .fkeyNewFolder: ko = "새폴더"; en = "NewFolder"
         case .fkeyDelete:    ko = "삭제"; en = "Delete"
         case .fkeyMove:      ko = "이동"; en = "Move"
+        case .fkeySameLocation: ko = "같은위치"; en = "Same Dir"
         case .fkeyCopyToOther: ko = "반대편으로 복사"; en = "Copy to Other Tree"
         case .fkeyMoveToOther: ko = "반대편으로 이동"; en = "Move to Other Tree"
 

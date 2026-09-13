@@ -25,6 +25,9 @@ struct FunctionKeyBar: View {
         // 복사·이동이 향하는 쪽. 보낼 것이 없으면 화살표를 붙이지 않는다.
         let source = store.transferSourcePaneIndex()
         let arrow = source.map { $0 == 0 ? " →" : " ←" } ?? ""
+        // 같은 위치 열기는 활성 트리의 위치를 반대편으로 보내는 쪽만 보여 준다(반대 방향 키도 그대로 동작).
+        // 버튼 둘을 두면 좁은 창에서 라벨이 잘린다.
+        let toRight = store.activePaneIndex == 0
         return [
             FKey(key: "F3", title: loc.string(.fkeyView),
                  enabled: hasCursor || store.selectedURL != nil) { store.fkeyView() },
@@ -42,6 +45,9 @@ struct FunctionKeyBar: View {
                  enabled: store.root != nil) { store.createFolderAtCursor() },
             FKey(key: "F8", title: loc.string(.fkeyDelete),
                  enabled: hasTargets) { store.requestDeleteAtCursor() },
+            FKey(key: toRight ? "⌥⌘→" : "⌥⌘←", title: loc.string(.fkeySameLocation),
+                 help: loc.string(toRight ? .menuSameLocationRight : .menuSameLocationLeft),
+                 enabled: store.activePane.root != nil) { store.showSameLocation(inPane: toRight ? 1 : 0) },
         ]
     }
 
