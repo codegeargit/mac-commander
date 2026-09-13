@@ -8,6 +8,7 @@ enum AppLinks {
     /// 소스 코드(GPLv3). 바이너리를 배포하므로 대응 소스를 받을 곳을 앱 안에서도 알린다.
     static let sourceCode = URL(string: "https://github.com/codegeargit/mac-commander")!
     /// 후원 링크.
+    static let githubSponsors = URL(string: "https://github.com/sponsors/codegeargit")!
     static let buyMeACoffee = URL(string: "https://buymeacoffee.com/codegear")!
 
     /// Pro 구매(체크아웃) 주소. 없으면 구매 버튼이 아예 표시되지 않는다.

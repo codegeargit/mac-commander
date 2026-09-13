@@ -57,12 +57,12 @@ struct PreferencesView: View {
         }
     }
 
-    /// 후원(Buy Me a Coffee) 섹션 — 자발적 후원 링크.
+    /// 후원 섹션 — GitHub Sponsors · Buy Me a Coffee 자발적 후원 링크.
     @ViewBuilder
     private var supportSection: some View {
         Section(loc.string(.supportSection)) {
-            Link(loc.string(.buyMeCoffee),
-                 destination: URL(string: "https://buymeacoffee.com/codegear")!)
+            Link(loc.string(.githubSponsors), destination: AppLinks.githubSponsors)
+            Link(loc.string(.buyMeCoffee), destination: AppLinks.buyMeACoffee)
             Text(loc.string(.supportHint))
                 .font(.caption)
                 .foregroundStyle(.secondary)

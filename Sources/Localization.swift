@@ -223,6 +223,7 @@ enum L10n {
     case licenseStatusPro    // 상태: Pro 활성
     case licenseStatusFree   // 상태: 무료
     case supportSection      // 후원 섹션 제목
+    case githubSponsors      // GitHub Sponsors 링크 라벨
     case buyMeCoffee         // Buy Me a Coffee 링크 라벨
     case supportHint         // 후원 안내 문구
 
@@ -523,6 +524,7 @@ enum L10n {
         case .licenseStatusPro: ko = "Pro 활성"; en = "Pro active"
         case .licenseStatusFree: ko = "무료 버전"; en = "Free version"
         case .supportSection:   ko = "후원"; en = "Support"
+        case .githubSponsors:   ko = "💖 GitHub Sponsors로 후원하기"; en = "💖 Sponsor on GitHub"
         case .buyMeCoffee:      ko = "☕️ 커피 한 잔 후원하기"; en = "☕️ Buy me a coffee"
         case .supportHint:      ko = "개발에 도움이 됩니다. 감사합니다!"; en = "It helps development. Thank you!"
 

@@ -241,6 +241,16 @@ a:hover{text-decoration:underline}
 .dl .art{display:flex;justify-content:center}
 .dl .art img{width:150px;height:150px;display:block;filter:drop-shadow(0 14px 34px rgba(51,204,255,.22))}
 
+/* ── 후원 ─────────────────────────────────────────── */
+.sup{display:grid;grid-template-columns:1fr minmax(0,600px);gap:26px;align-items:center}
+.sup h2{
+  font-size:clamp(22px,3vw,30px);margin:0 0 10px;font-weight:600;letter-spacing:-.01em;
+}
+/* GitHub Sponsors 카드 위젯. 방문자의 시스템 테마(라이트/다크)를 따라 그려진다.
+   GitHub 안내 크기는 600×225지만 넓은 화면에선 소개글이 두세 줄이라 아래가 비어 높이를 줄인다.
+   좁은 화면에선 글이 여러 줄로 접히므로 원래 높이로 되돌린다. */
+.sup .card-embed{display:block;width:100%;max-width:600px;height:150px;border:1px solid var(--divider);background:var(--viewer)}
+
 footer{
   max-width:1120px;margin:0 auto;padding:6px 16px 30px;
   color:var(--muted);font-size:12px;
@@ -272,7 +282,8 @@ footer .sp{margin-left:auto}
   .hero .tree{border-right:0;border-bottom:1px solid var(--divider)}
   .hero .doc{padding:30px 22px 26px}
   .cards,.keys{grid-template-columns:1fr}
-  .split,.dl{grid-template-columns:1fr}
+  .split,.dl,.sup{grid-template-columns:1fr}
+  .sup .card-embed{height:225px}
   .dl .art{order:-1}
   .dl .art img{width:104px;height:104px}
   .listing .head{display:none}
@@ -514,7 +525,7 @@ footer .sp{margin-left:auto}
             <li>macOS 14.0 (Sonoma) 이상 · Apple Silicon · Intel</li>
             <li>Sparkle 자동 업데이트 — 새 버전이 나오면 앱이 알려줍니다</li>
             <li>한국어 · English</li>
-            <li>무료</li>
+            <li>무료 · <a href="https://github.com/codegeargit/mac-commander">GPLv3 오픈소스</a></li>
           </ul>
           <div class="cta" style="margin-top:22px">
             <a class="btn" href="https://github.com/codegeargit/mac-commander-releases/releases/download/v1.8/MacCommander-1.8.dmg">1.8 다운로드 (.dmg)</a>
@@ -522,6 +533,28 @@ footer .sp{margin-left:auto}
           </div>
         </div>
         <div class="art"><img src="icon.png" alt="Mac Commander 앱 아이콘"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 후원 ─────────────────────────────────────── -->
+  <section class="panel" id="support">
+    <div class="bar"><b>~/후원</b><span>— 모든 기능 무료 · GPLv3 오픈소스</span></div>
+    <div class="pad">
+      <div class="sup">
+        <div>
+          <h2>도움이 됐다면, 후원으로 응원해 주세요.</h2>
+          <p style="color:#A9BFD6;font-size:13px;margin:0;max-width:52ch">
+            Mac Commander는 모든 기능이 무료이고 소스 코드가 공개되어 있습니다.
+            후원금은 새 기능과 버그 수정, Apple 개발자 계정·공증 비용에 씁니다.
+          </p>
+          <div class="cta" style="margin-top:22px">
+            <a class="btn" href="https://github.com/sponsors/codegeargit">GitHub Sponsors</a>
+            <a class="btn ghost" href="https://buymeacoffee.com/codegear">Buy Me a Coffee</a>
+          </div>
+        </div>
+        <iframe class="card-embed" src="https://github.com/sponsors/codegeargit/card"
+                title="GitHub Sponsors로 codegeargit 후원하기" loading="lazy"></iframe>
       </div>
     </div>
   </section>
