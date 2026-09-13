@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mac Commander — macOS 마크다운 파일 매니저</title>
+<meta name="description" content="Total Commander의 키보드 중심 파일 관리에 마크다운 뷰어를 붙인 macOS 앱. 트리에서 고르고, 옆 패널에서 바로 읽는다.">
+<link rel="icon" href="icon.png">
+<meta property="og:title" content="Mac Commander">
+<meta property="og:description" content="마크다운을 파일처럼 다루는 macOS 앱.">
+<meta property="og:image" content="icon.png">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0A1A33;
+  --viewer:#0D1117;
+  --header:#10325C;
+  --accent:#33CCFF;
+  --accent-dim:#2A6FB0;
+  --text:#E6F1FF;
+  --folder:#7FE9FF;
+  --muted:#7A8CA3;
+  --divider:#1C2F4A;
+  --select-bg:#33CCFF;
+  --select-fg:#06243F;
+  --amber:#FFC46B;
+  --page:#050D1A;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --serif:'Newsreader',ui-serif,Georgia,serif;
+  --bar-h:38px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  padding:0 0 calc(var(--bar-h) + 8px);
+  background:var(--page);
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  word-break:keep-all;      /* 한글이 단어 중간에서 끊기지 않게 */
+  overflow-wrap:break-word;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+.skip{position:absolute;left:-9999px;top:0;padding:8px 12px;background:var(--accent);color:var(--select-fg)}
+.skip:focus{left:8px;top:8px;z-index:60}
+
+/* ── 상단 경로 바 (앱의 패널 헤더) ───────────────── */
+.pathbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:10px;
+  height:40px;padding:0 14px;
+  background:var(--header);
+  border-bottom:1px solid var(--divider);
+  font-size:12.5px;
+}
+.pathbar .mark{display:flex;align-items:center;gap:8px;font-weight:600;letter-spacing:.02em}
+.pathbar .mark img{width:20px;height:20px;border-radius:5px;display:block}
+.pathbar .sep{color:var(--accent-dim)}
+.pathbar .ver{color:var(--folder)}
+.pathbar .right{margin-left:auto;display:flex;gap:14px;align-items:center}
+.pathbar .right a{color:var(--text);opacity:.75}
+.pathbar .right a:hover{opacity:1;color:var(--accent);text-decoration:none}
+
+/* ── 공통 패널 프레임 ─────────────────────────────── */
+.wrap{max-width:1120px;margin:0 auto;padding:26px 16px 0}
+.panel{
+  border:1px solid var(--divider);
+  background:var(--navy);
+  scroll-margin-top:56px;
+  margin-bottom:26px;
+}
+.panel > .bar{
+  display:flex;align-items:baseline;gap:10px;
+  padding:7px 12px;
+  background:var(--header);
+  border-bottom:1px solid var(--divider);
+  font-size:12px;letter-spacing:.03em;
+}
+.panel > .bar b{font-weight:600;color:var(--text)}
+.panel > .bar span{color:#9FC4E8;font-weight:400}
+.panel > .bar .count{margin-left:auto;color:#9FC4E8}
+.panel .pad{padding:20px 18px}
+
+/* ── 히어로 ───────────────────────────────────────── */
+.hero{display:grid;grid-template-columns:298px 1fr;min-height:min(470px,68vh)}
+.hero .tree{
+  background:var(--navy);
+  border-right:1px solid var(--divider);
+  padding:10px 0 0;
+  display:flex;flex-direction:column;
+}
+.hero .doc{background:var(--viewer);padding:38px 40px 30px;display:flex;flex-direction:column}
+
+.tree ul{list-style:none;margin:0;padding:0;font-size:13px;line-height:21px}
+.tree li{
+  display:flex;gap:0;align-items:center;
+  padding:0 10px;white-space:nowrap;overflow:hidden;
+  animation:rowin .34s cubic-bezier(.2,.7,.3,1) backwards;
+  animation-delay:calc(var(--i) * 45ms);
+}
+@keyframes rowin{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+.tree .guide{color:var(--accent-dim);opacity:.85;white-space:pre}
+.tree .dir{color:var(--folder)}
+.tree .file{color:var(--text)}
+.tree .dim{color:var(--muted)}
+.tree li.sel{background:var(--select-bg);color:var(--select-fg)}
+.tree li.sel .file,.tree li.sel .guide,.tree li.sel .dim{color:var(--select-fg)}
+.tree li.sel::after{content:'◄';margin-left:auto;padding-left:10px;font-size:11px}
+.tree .status{
+  margin-top:auto;border-top:1px solid var(--divider);
+  padding:6px 12px;font-size:11.5px;color:var(--muted);
+  display:flex;gap:8px;
+}
+.tree .status .on{color:var(--accent)}
+
+.doc h1{
+  font-family:var(--mono);font-weight:600;
+  font-size:clamp(34px,5.4vw,52px);
+  letter-spacing:-.02em;line-height:1.04;
+  margin:0 0 6px;
+}
+.doc h1 .cursor{
+  display:inline-block;width:.5em;height:.86em;vertical-align:-.06em;
+  background:var(--accent);margin-left:.12em;
+  animation:blink 1.15s steps(1,end) infinite;
+}
+@keyframes blink{50%{opacity:0}}
+.doc .rule{height:1px;background:var(--divider);margin:14px 0 20px}
+.doc .lede{
+  font-family:var(--serif);font-size:20px;line-height:1.62;
+  color:#CFE2F7;margin:0 0 10px;max-width:44ch;
+}
+.doc .lede em{color:var(--accent);font-style:normal}
+.doc .sub{font-size:13px;color:var(--muted);margin:0 0 26px;max-width:52ch;line-height:1.7}
+.cta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+.btn{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:11px 18px;font-family:var(--mono);font-size:13.5px;font-weight:600;
+  border:1px solid var(--accent);color:var(--select-fg);background:var(--accent);
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+.btn:hover{text-decoration:none;transform:translateY(-1px);box-shadow:0 6px 20px -8px var(--accent)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.ghost:hover{background:rgba(51,204,255,.1)}
+.btn .kbd{
+  font-size:11px;padding:1px 5px;border:1px solid currentColor;opacity:.7;font-weight:500;
+}
+.meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px}
+.meta .dot{color:var(--accent-dim)}
+
+/* ── 기능 목록: 파일 리스팅처럼 ───────────────────── */
+.listing{font-size:13px}
+.listing .head,.listing .row{
+  display:grid;grid-template-columns:1.15fr 118px 2fr;
+  gap:14px;padding:4px 18px;align-items:baseline;
+}
+.listing .head{
+  color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  border-bottom:1px solid var(--divider);padding-bottom:7px;margin-bottom:6px;
+}
+.listing .row .nm{color:var(--folder)}
+.listing .row .ky{color:var(--text)}
+.listing .row .ds{color:#A9BFD6;font-size:12.5px}
+.listing .row:hover{background:var(--select-bg)}
+.listing .row:hover .nm,.listing .row:hover .ky,.listing .row:hover .ds{color:var(--select-fg)}
+.listing .row:last-child{margin-bottom:12px}
+
+/* ── 뷰어 섹션 카드 ───────────────────────────────── */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.card{border:1px solid var(--divider);background:var(--viewer);padding:16px}
+.card h3{margin:0 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.card p{margin:10px 0 0;font-size:12.5px;color:#A9BFD6;line-height:1.6}
+.card .demo{
+  min-height:96px;display:flex;align-items:center;justify-content:center;
+  margin-top:10px;padding:10px;background:#080D14;border:1px solid #16202E;
+}
+.formula{font-family:var(--serif);font-size:22px;color:var(--text);display:flex;align-items:center;gap:.28em}
+.formula .int{font-size:30px;line-height:.9}
+.formula sup,.formula sub{font-size:.52em}
+.frac{display:inline-flex;flex-direction:column;text-align:center;font-size:.82em;line-height:1.12}
+.frac .den{border-top:1px solid currentColor;padding-top:1px}
+.mdtable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px}
+.mdtable th,.mdtable td{border:1px solid var(--divider);padding:4px 7px;text-align:left}
+.mdtable th{color:var(--accent);font-weight:600}
+.mdtable td{color:#A9BFD6}
+.types{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+.chip{
+  font-size:11.5px;padding:3px 9px;border:1px solid var(--divider);
+  color:var(--muted);background:#08111F;
+}
+.chip.hi{color:var(--accent);border-color:var(--accent-dim)}
+
+/* ── 터미널 ───────────────────────────────────────── */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:center}
+.term{background:#080D14;border:1px solid var(--divider);font-size:12.5px;line-height:1.75}
+.term .tbar{
+  background:#101826;padding:5px 10px;border-bottom:1px solid var(--divider);
+  color:var(--muted);font-size:11px;display:flex;gap:7px;align-items:center;
+}
+.term .tbar i{width:9px;height:9px;border-radius:50%;background:#2B3A4E;display:inline-block}
+.term .body{padding:12px 13px;white-space:pre-wrap}
+.term .p{color:var(--accent)}
+.term .o{color:var(--muted)}
+.term .caret{
+  display:inline-block;width:7px;height:14px;background:var(--accent);
+  vertical-align:-2px;animation:blink 1.15s steps(1,end) infinite;
+}
+.prose{font-family:var(--serif);font-size:16.5px;line-height:1.68;color:#CFE2F7}
+.prose p{margin:0 0 14px}
+.prose strong{color:var(--text);font-weight:500}
+.prose .k{font-family:var(--mono);font-size:.8em;color:var(--accent);border:1px solid var(--divider);padding:1px 5px}
+
+/* ── 단축키 ───────────────────────────────────────── */
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:18px 26px}
+.keys section h3{
+  margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);font-weight:600;
+}
+.keys dl{margin:0;font-size:12.5px}
+.keys .kr{display:flex;gap:12px;padding:2.5px 0;align-items:baseline}
+.keys .kr dt{width:96px;flex:none;color:var(--text);font-variant-numeric:tabular-nums}
+.keys .kr dd{margin:0;color:#A9BFD6}
+
+/* ── 다운로드 ─────────────────────────────────────── */
+.dl{display:grid;grid-template-columns:1fr 300px;gap:26px;align-items:center}
+.dl h2{
+  font-size:clamp(22px,3vw,30px);margin:0 0 10px;font-weight:600;letter-spacing:-.01em;
+}
+.dl .facts{margin:16px 0 0;padding:0;list-style:none;font-size:12.5px;color:#A9BFD6}
+.dl .facts li{padding:3px 0 3px 18px;position:relative}
+.dl .facts li::before{content:'›';position:absolute;left:2px;color:var(--accent)}
+.dl .art{display:flex;justify-content:center}
+.dl .art img{width:150px;height:150px;display:block;filter:drop-shadow(0 14px 34px rgba(51,204,255,.22))}
+
+footer{
+  max-width:1120px;margin:0 auto;padding:6px 16px 30px;
+  color:var(--muted);font-size:12px;
+  display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;
+}
+footer .sp{margin-left:auto}
+
+/* ── 시그니처: 펑션키 바 ──────────────────────────── */
+.fbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;
+  display:grid;grid-template-columns:repeat(8,1fr);gap:1px;
+  height:var(--bar-h);
+  background:var(--divider);
+  border-top:1px solid var(--accent-dim);
+}
+.fbar a{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--header);color:var(--text);
+  font-size:12px;letter-spacing:.01em;
+  transition:background .1s ease,color .1s ease;
+}
+.fbar a .n{color:var(--amber);font-weight:600;font-variant-numeric:tabular-nums}
+.fbar a:hover,.fbar a[aria-current="true"]{background:var(--select-bg);color:var(--select-fg);text-decoration:none}
+.fbar a:hover .n,.fbar a[aria-current="true"] .n{color:var(--select-fg)}
+
+/* ── 반응형 ───────────────────────────────────────── */
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr}
+  .hero .tree{border-right:0;border-bottom:1px solid var(--divider)}
+  .hero .doc{padding:30px 22px 26px}
+  .cards,.keys{grid-template-columns:1fr}
+  .split,.dl{grid-template-columns:1fr}
+  .dl .art{order:-1}
+  .dl .art img{width:104px;height:104px}
+  .listing .head{display:none}
+  .listing .row{grid-template-columns:1fr auto;gap:2px 12px;padding:9px 14px;border-bottom:1px solid var(--divider)}
+  .listing .row .ds{grid-column:1/-1}
+  .fbar{grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);height:calc(var(--bar-h) * 2)}
+  body{padding-bottom:calc(var(--bar-h) * 2 + 8px)}
+  .pathbar .right{gap:10px}
+}
+@media (max-width:420px){
+  .pathbar .hidesm{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#intro">본문 바로가기</a>
+
+<header class="pathbar">
+  <span class="mark"><img src="icon.png" alt=""> Mac Commander</span>
+  <span class="sep hidesm">/</span>
+  <span class="ver hidesm">1.8 (9)</span>
+  <span class="right">
+    <a href="#download">다운로드</a>
+    <a href="https://github.com/codegeargit/mac-commander-releases">GitHub</a>
+  </span>
+</header>
+
+<div class="wrap">
+
+  <!-- ── 소개 ─────────────────────────────────────── -->
+  <section class="panel" id="intro">
+    <div class="bar"><b>~/documents</b><span>— 마크다운 작업 폴더</span><span class="count">파일 7개</span></div>
+    <div class="hero">
+      <div class="tree">
+        <ul>
+          <li style="--i:0"><span class="guide">▾ </span><span class="dir">design</span></li>
+          <li style="--i:1"><span class="guide">│ ├ </span><span class="file">design-tokens.md</span></li>
+          <li style="--i:2"><span class="guide">│ └ </span><span class="file">visual-style.md</span></li>
+          <li style="--i:3"><span class="guide">▾ </span><span class="dir">planning</span></li>
+          <li style="--i:4"><span class="guide">│ ├ </span><span class="file">컨셉.md</span></li>
+          <li style="--i:5"><span class="guide">│ └ </span><span class="file">로드맵.md</span></li>
+          <li style="--i:6" class="sel"><span class="guide">  </span><span class="file">Mac Commander.md</span></li>
+          <li style="--i:7"><span class="guide">  </span><span class="file">README.md</span></li>
+          <li style="--i:8"><span class="guide">  </span><span class="file">회의록-0729.md</span></li>
+        </ul>
+        <div class="status"><span class="on">마크다운만</span><span>·</span><span>정렬: 폴더 먼저</span></div>
+      </div>
+
+      <div class="doc">
+        <h1>Mac&nbsp;Commander<span class="cursor"></span></h1>
+        <div class="rule"></div>
+        <p class="lede">마크다운을 <em>파일처럼</em> 다루는 macOS 앱.
+          왼쪽 트리에서 고르고, 오른쪽 패널에서 그대로 읽는다.</p>
+        <p class="sub">Total Commander의 키보드 중심 파일 관리를 macOS 네이티브로 옮겼습니다.
+          문서 폴더를 통째로 열어두고 파일을 옮기고 이름을 바꾸면서, 같은 창에서 읽고 고칩니다.</p>
+        <div class="cta">
+          <a class="btn" href="https://github.com/codegeargit/mac-commander-releases/releases/download/v1.8/MacCommander-1.8.dmg">
+            1.8 다운로드 (.dmg) <span class="kbd">F5</span>
+          </a>
+          <a class="btn ghost" href="https://github.com/codegeargit/mac-commander-releases/releases">릴리스 노트</a>
+        </div>
+        <p class="meta">
+          <span>macOS 14.0+</span><span class="dot">·</span>
+          <span>Apple 공증 완료</span><span class="dot">·</span>
+          <span>5.5 MB</span><span class="dot">·</span>
+          <span>무료</span><span class="dot">·</span>
+          <span>자동 업데이트</span>
+          <!-- 다운로드 수는 일정 기준을 넘을 때만 스크립트가 채워 넣는다. -->
+          <span id="dlcount" hidden></span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 기능 ─────────────────────────────────────── -->
+  <section class="panel" id="features">
+    <div class="bar"><b>~/기능</b><span>— 파일 매니저가 하는 일</span><span class="count">11개 항목</span></div>
+    <div class="listing" style="padding-top:12px">
+      <div class="head"><span>이름</span><span>단축키</span><span>설명</span></div>
+      <div class="row"><span class="nm">폴더 열기</span><span class="ky">⌘O</span><span class="ds">폴더를 창에 떨어뜨려도 열립니다. 다음 실행 때 그대로 복원됩니다.</span></div>
+      <div class="row"><span class="nm">마크다운만 보기</span><span class="ky">헤더 토글</span><span class="ds">.md·.markdown·.mdown·.mkd만 남기거나, 전체 파일을 봅니다.</span></div>
+      <div class="row"><span class="nm">새 파일 / 새 폴더</span><span class="ky">⌘N · ⇧⌘N</span><span class="ds">만들자마자 트리에서 이름을 바로 입력합니다.</span></div>
+      <div class="row"><span class="nm">멀티 리네임</span><span class="ky">⌘R</span><span class="ds">여러 파일 이름을 규칙으로 한 번에 바꿉니다. 바꾸기 전 결과를 미리 봅니다.</span></div>
+      <div class="row"><span class="nm">이동 · 복사</span><span class="ky">드래그 · ⌥드래그</span><span class="ds">트리 안에서 끌어 옮기고, Option을 누른 채 끌면 복사합니다.</span></div>
+      <div class="row"><span class="nm">휴지통으로 삭제</span><span class="ky">⌘⌫ · F8</span><span class="ds">지우지 않고 휴지통으로 보냅니다. 되돌릴 수 있습니다.</span></div>
+      <div class="row"><span class="nm">폴더로 이동</span><span class="ky">⇧⌘G</span><span class="ds">경로를 직접 입력해 그 폴더를 새 루트로 엽니다.</span></div>
+      <div class="row"><span class="nm">뷰어 패널 분할</span><span class="ky">⌃⌘+ · ⌃⌘-</span><span class="ds">문서를 최대 3개까지 나란히 놓고 비교합니다.</span></div>
+      <div class="row"><span class="nm">편집과 저장</span><span class="ky">⌘E · ⌘S</span><span class="ds">읽던 문서를 그 자리에서 고칩니다. 저장 안 된 문서는 표시가 붙습니다.</span></div>
+      <div class="row"><span class="nm">터미널 패널</span><span class="ky">⌃`</span><span class="ds">지금 보고 있는 폴더에서 셸이 열립니다.</span></div>
+      <div class="row"><span class="nm">세션 복원</span><span class="ky">자동</span><span class="ds">창 크기, 패널 폭, 펼친 폴더, 열어둔 문서를 그대로 되살립니다.</span></div>
+    </div>
+  </section>
+
+  <!-- ── 뷰어 ─────────────────────────────────────── -->
+  <section class="panel" id="viewer">
+    <div class="bar"><b>~/뷰어</b><span>— 트리에서 고르면 오른쪽에 그려지는 것들</span></div>
+    <div class="pad">
+      <div class="cards">
+        <div class="card">
+          <h3>수식</h3>
+          <div class="demo">
+            <span class="formula">
+              <span class="int">∫</span><span><sup>∞</sup><br><sub>0</sub></span>
+              <span>e<sup>−x²</sup> dx</span><span>=</span>
+              <span class="frac"><span class="num">√π</span><span class="den">2</span></span>
+            </span>
+          </div>
+          <p>KaTeX로 <code>$...$</code>와 <code>$$...$$</code>를 그립니다. 인터넷 연결 없이 앱 안에서 처리합니다.</p>
+        </div>
+        <div class="card">
+          <h3>다이어그램</h3>
+          <div class="demo">
+            <svg width="196" height="86" viewBox="0 0 196 86" role="img" aria-label="mermaid 순서도 예시">
+              <g fill="none" stroke="#2A6FB0" stroke-width="1">
+                <rect x="1" y="30" width="56" height="26"/>
+                <rect x="76" y="4" width="56" height="26"/>
+                <rect x="76" y="56" width="56" height="26"/>
+                <rect x="150" y="30" width="45" height="26" stroke="#33CCFF"/>
+              </g>
+              <g stroke="#33CCFF" stroke-width="1">
+                <path d="M57 43 h9 l0 -26 h10" fill="none"/>
+                <path d="M57 43 h9 l0 26 h10" fill="none"/>
+                <path d="M132 17 h9 l0 26 h9" fill="none"/>
+                <path d="M132 69 h9 l0 -26 h9" fill="none"/>
+              </g>
+              <g font-family="IBM Plex Mono, monospace" font-size="9" fill="#E6F1FF" text-anchor="middle">
+                <text x="29" y="47">문서</text><text x="104" y="21">읽기</text>
+                <text x="104" y="73">편집</text><text x="172" y="47" fill="#33CCFF">저장</text>
+              </g>
+            </svg>
+          </div>
+          <p>Mermaid 코드 블록을 순서도·시퀀스 다이어그램으로 렌더링합니다.</p>
+        </div>
+        <div class="card">
+          <h3>표와 코드</h3>
+          <div class="demo">
+            <table class="mdtable">
+              <tr><th>키</th><th>값</th></tr>
+              <tr><td>accent</td><td>#33CCFF</td></tr>
+              <tr><td>panel</td><td>#0A1A33</td></tr>
+            </table>
+          </div>
+          <p>표, 코드 블록, 인용, 체크리스트를 앱 테마에 맞춘 스타일로 보여줍니다.</p>
+        </div>
+      </div>
+      <div class="types">
+        <span class="chip hi">.md</span><span class="chip hi">.markdown</span><span class="chip hi">.mdown</span>
+        <span class="chip hi">.mkd</span><span class="chip">.pdf</span><span class="chip">.html</span>
+        <span class="chip">.htm</span><span class="chip">.png</span><span class="chip">.jpg</span>
+        <span class="chip">.gif</span><span class="chip">.svg</span><span class="chip">.webp</span>
+        <span class="chip">.heic</span><span class="chip">.tiff</span><span class="chip">.icns</span>
+      </div>
+      <p style="font-size:12.5px;color:#A9BFD6;margin:14px 0 0">
+        PDF는 확대·폭 맞춤이 되는 전용 뷰어로, 이미지는 원본 비율 그대로, HTML은 웹뷰로 엽니다.
+        마크다운 안에 넣은 상대 경로 이미지도 그대로 보입니다.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 터미널 ───────────────────────────────────── -->
+  <section class="panel" id="terminal">
+    <div class="bar"><b>~/터미널</b><span>— 창을 옮겨 다니지 않아도 되는 이유</span></div>
+    <div class="pad">
+      <div class="split">
+        <div class="term">
+          <div class="tbar"><i></i><i></i><i></i> documents — zsh</div>
+          <div class="body"><span class="p">$</span> pwd
+<span class="o">/Users/you/documents/planning</span>
+
+<span class="p">$</span> claude<span class="caret"></span></div>
+        </div>
+        <div class="prose">
+          <p><span class="k">⌃`</span> 를 누르면 창 아래쪽에서 터미널이 올라옵니다. 지금 트리에서 보고 있는
+            폴더가 곧 작업 디렉터리라서, <strong>cd 할 일이 없습니다.</strong></p>
+          <p>버튼 하나로 그 폴더에서 <strong>Claude Code</strong>를 띄울 수 있습니다.
+            문서를 읽다가, 고치다가, 바로 옆에서 명령을 실행하는 흐름이 한 창 안에서 끝납니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 단축키 ───────────────────────────────────── -->
+  <section class="panel" id="shortcuts">
+    <div class="bar"><b>~/단축키</b><span>— 손을 키보드에 두는 쪽이 빠릅니다</span></div>
+    <div class="pad">
+      <div class="keys">
+        <section>
+          <h3>파일</h3>
+          <dl>
+            <div class="kr"><dt>⌘N · ⇧⌘N</dt><dd>새 파일 · 새 폴더</dd></div>
+            <div class="kr"><dt>⌘R</dt><dd>멀티 리네임</dd></div>
+            <div class="kr"><dt>⌘⌫</dt><dd>휴지통으로 삭제</dd></div>
+            <div class="kr"><dt>⌘O</dt><dd>폴더 열기</dd></div>
+            <div class="kr"><dt>⌘T</dt><dd>터미널에서 열기</dd></div>
+            <div class="kr"><dt>⌘↑ · ⇧⌘G</dt><dd>상위 폴더 · 경로로 이동</dd></div>
+          </dl>
+        </section>
+        <section>
+          <h3>뷰어</h3>
+          <dl>
+            <div class="kr"><dt>⌘E · ⌘S</dt><dd>편집 전환 · 저장</dd></div>
+            <div class="kr"><dt>⌘+ · ⌘-</dt><dd>글자 크게 · 작게</dd></div>
+            <div class="kr"><dt>⌘0</dt><dd>기본 크기로</dd></div>
+            <div class="kr"><dt>⌘ + 휠</dt><dd>확대 · 축소</dd></div>
+            <div class="kr"><dt>⇥ · ⇧⇥</dt><dd>트리 ↔ 패널 포커스</dd></div>
+            <div class="kr"><dt>⌃⌘+ · ⌃⌘-</dt><dd>패널 추가 · 제거</dd></div>
+          </dl>
+        </section>
+        <section>
+          <h3>펑션 키</h3>
+          <dl>
+            <div class="kr"><dt>F3 · F4</dt><dd>보기 · 편집</dd></div>
+            <div class="kr"><dt>F5 · F6</dt><dd>복사 · 이름변경</dd></div>
+            <div class="kr"><dt>F7 · F8</dt><dd>새폴더 · 삭제</dd></div>
+            <div class="kr"><dt>Space</dt><dd>선택 토글</dd></div>
+            <div class="kr"><dt>⌘ · ⇧ 클릭</dt><dd>새 패널 · 범위 선택</dd></div>
+            <div class="kr"><dt>⌃`</dt><dd>터미널 열기 · 닫기</dd></div>
+          </dl>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 다운로드 ─────────────────────────────────── -->
+  <section class="panel" id="download">
+    <div class="bar"><b>~/다운로드</b><span>— MacCommander-1.8.dmg</span><span class="count">5.5 MB</span></div>
+    <div class="pad">
+      <div class="dl">
+        <div>
+          <h2>받아서 열면 그걸로 끝납니다.</h2>
+          <p style="color:#A9BFD6;font-size:13px;margin:0;max-width:52ch">
+            dmg를 열고 앱을 <b style="color:var(--text)">응용 프로그램</b> 폴더에 끌어다 놓으세요.
+            Developer ID로 서명하고 Apple 공증을 받았기 때문에 경고 없이 실행됩니다.
+          </p>
+          <ul class="facts">
+            <li>macOS 14.0 (Sonoma) 이상 · Apple Silicon · Intel</li>
+            <li>Sparkle 자동 업데이트 — 새 버전이 나오면 앱이 알려줍니다</li>
+            <li>한국어 · English</li>
+            <li>무료</li>
+          </ul>
+          <div class="cta" style="margin-top:22px">
+            <a class="btn" href="https://github.com/codegeargit/mac-commander-releases/releases/download/v1.8/MacCommander-1.8.dmg">1.8 다운로드 (.dmg)</a>
+            <a class="btn ghost" href="https://github.com/codegeargit/mac-commander-releases/releases">모든 버전</a>
+          </div>
+        </div>
+        <div class="art"><img src="icon.png" alt="Mac Commander 앱 아이콘"></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <span>만든이 CodeGear</span>
+  <span>·</span>
+  <a href="https://github.com/codegeargit/mac-commander">소스 코드 (GPLv3)</a>
+  <span>·</span>
+  <a href="https://github.com/codegeargit/mac-commander-releases">배포 저장소</a>
+  <span>·</span>
+  <a href="https://github.com/codegeargit/mac-commander-releases/blob/main/EULA.md">사용 약관</a>
+  <span class="sp">Mac Commander 1.8 (9)</span>
+</footer>
+
+<nav class="fbar" aria-label="펑션 키 탐색">
+  <a href="#intro" data-fkey="F1"><span class="n">1</span>소개</a>
+  <a href="#features" data-fkey="F2"><span class="n">2</span>기능</a>
+  <a href="#viewer" data-fkey="F3"><span class="n">3</span>뷰어</a>
+  <a href="#terminal" data-fkey="F4"><span class="n">4</span>터미널</a>
+  <a href="#download" data-fkey="F5"><span class="n">5</span>다운로드</a>
+  <a href="#shortcuts" data-fkey="F6"><span class="n">6</span>단축키</a>
+  <a href="https://github.com/codegeargit/mac-commander-releases/releases" data-fkey="F7"><span class="n">7</span>릴리스</a>
+  <a href="https://github.com/codegeargit/mac-commander-releases" data-fkey="F8"><span class="n">8</span>GitHub</a>
+</nav>
+
+<script>
+// 지금까지의 dmg 다운로드 수를 GitHub Releases에서 가져와 히어로에 덧붙인다.
+//
+// 숫자가 작을 때는 아예 그리지 않는다. "5회 다운로드"는 사회적 증거가 아니라 그 반대라서,
+// 기준을 넘길 때까지 조용히 있다가 저절로 나타나게 해 뒀다(나중에 손댈 필요가 없다).
+// 실패(오프라인·API 한도 초과)해도 조용히 넘어간다 — 페이지의 본론이 아니다.
+(function () {
+  var MIN_TO_SHOW = 50;
+  var el = document.getElementById('dlcount');
+  if (!el) return;
+
+  fetch('https://api.github.com/repos/codegeargit/mac-commander-releases/releases')
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function (releases) {
+      var total = releases.reduce(function (sum, rel) {
+        return sum + (rel.assets || []).reduce(function (s, a) {
+          return s + (/\.dmg$/.test(a.name) ? (a.download_count || 0) : 0);
+        }, 0);
+      }, 0);
+      if (total < MIN_TO_SHOW) return;
+      el.innerHTML = '<span class="dot">·</span>' +
+        '지금까지 ' + total.toLocaleString('ko-KR') + '번 받았습니다';
+      el.hidden = false;
+    })
+    .catch(function () { /* 숫자를 못 가져와도 페이지는 그대로 쓸 수 있다 */ });
+})();
+
+(function () {
+  var bar = document.querySelector('.fbar');
+  var links = Array.prototype.slice.call(bar.querySelectorAll('a'));
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // 펑션 키로 섹션 이동 — 앱의 F키 바와 같은 규칙.
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var hit = links.filter(function (a) { return a.dataset.fkey === e.key; })[0];
+    if (!hit) return;
+    e.preventDefault();
+    if (hit.hash) {
+      document.querySelector(hit.hash).scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+      history.replaceState(null, '', hit.hash);
+    } else {
+      window.open(hit.href, '_blank', 'noopener');
+    }
+  });
+
+  // 지금 보고 있는 섹션을 F키 바에 표시.
+  var sections = links
+    .filter(function (a) { return a.hash; })
+    .map(function (a) { return { a: a, el: document.querySelector(a.hash) }; });
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      sections.forEach(function (s) {
+        s.a.setAttribute('aria-current', String(s.el === entry.target));
+      });
+    });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+
+  sections.forEach(function (s) { io.observe(s.el); });
+})();
+</script>
+</body>
+</html>
