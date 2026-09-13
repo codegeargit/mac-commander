@@ -6,7 +6,7 @@ enum LicenseValidation: Equatable {
     case valid(email: String?, expiresAt: Date?)
     /// 키는 형식상 인식됐지만 유효하지 않음(폐기/환불/만료/한도초과 등). 사유 메시지.
     case invalid(reason: String)
-    /// 검증 자체를 못 함(네트워크 오류 등). 온라인 재시도 대상 — Pro를 즉시 끄지 않음.
+    /// 검증 자체를 못 함(네트워크 오류 등). 온라인 재시도 대상 — 후원자 상태를 즉시 끄지 않음.
     case unreachable(reason: String)
 }
 
@@ -38,7 +38,7 @@ protocol LicenseProvider: Sendable {
 
 // MARK: - 개발용 목 구현
 
-/// 서비스 연동 전 개발·테스트용. "MC-PRO-"로 시작하는 키를 유효로 취급한다.
+/// 서비스 연동 전 개발·테스트용. "MC-SUPPORTER-"로 시작하는 키를 유효로 취급한다.
 struct MockLicenseProvider: LicenseProvider {
     func activate(key: String, instanceName: String) async -> LicenseActivation {
         switch await validate(key: key, instanceId: nil) {
@@ -54,7 +54,7 @@ struct MockLicenseProvider: LicenseProvider {
     func validate(key: String, instanceId: String?) async -> LicenseValidation {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .invalid(reason: "empty key") }
-        if trimmed.uppercased().hasPrefix("MC-PRO-") {
+        if trimmed.uppercased().hasPrefix("MC-SUPPORTER-") {
             return .valid(email: nil, expiresAt: nil)
         }
         return .invalid(reason: "unrecognized key")
@@ -76,7 +76,7 @@ struct CreemLicenseProvider: LicenseProvider {
     static let proxyBase = URL(string: "https://mac-commander-license.maccommander.workers.dev")!
 
     /// 프록시 주소가 실제 값으로 채워졌는지.
-    /// 자리표시자를 그대로 둔 채 배포되면 Pro가 조용히 죽는 대신 "연결 불가"로 드러난다.
+    /// 자리표시자를 그대로 둔 채 배포되면 키가 조용히 무효가 되는 대신 "연결 불가"로 드러난다.
     static var isConfigured: Bool { !proxyBase.absoluteString.contains("TODO-") }
 
     private var session: URLSession { .shared }
@@ -139,7 +139,7 @@ struct CreemLicenseProvider: LicenseProvider {
         let instanceId: String?
         let expiresAtDate: Date?
 
-        /// Creem의 LicenseStatus 중 active만 Pro로 인정한다(inactive/expired/disabled는 제외).
+        /// Creem의 LicenseStatus 중 active만 유효한 후원자 키로 인정한다(inactive/expired/disabled는 제외).
         var isActive: Bool { status == nil || status == "active" }
 
         enum CodingKeys: String, CodingKey {

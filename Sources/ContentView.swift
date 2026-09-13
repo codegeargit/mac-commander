@@ -7,7 +7,6 @@ struct ContentView: View {
     @EnvironmentObject private var store: WorkspaceStore
     @EnvironmentObject private var theme: ThemeManager
     @EnvironmentObject private var loc: LocalizationManager
-    @EnvironmentObject private var license: LicenseManager
     @Environment(\.colorScheme) private var systemScheme
     /// ⌘+휠을 가로채는 로컬 이벤트 모니터(해제용 토큰).
     @State private var scrollMonitor: Any?
@@ -67,16 +66,6 @@ struct ContentView: View {
             AcknowledgementsView()
                 .environmentObject(loc)
         }
-        // Pro 기능 안내 시트 — 무료 사용자가 Pro 동작을 시도하면 열린다.
-        .sheet(item: $store.upsellFeature) { feature in
-            ProUpsellView(feature: feature)
-                .environmentObject(loc)
-        }
-        // 같은 시트를 도움말 메뉴에서 직접 열었을 때(특정 기능이 막힌 게 아니므로 소개 모드).
-        .sheet(isPresented: $store.showProInfo) {
-            ProUpsellView(feature: nil)
-                .environmentObject(loc)
-        }
         // 폴더로 이동(⌘⇧G) 시트 — 현재 루트 경로로 초기화.
         .sheet(isPresented: $store.showGoToFolder) {
             GoToFolderView(initialPath: store.root?.url.path ?? "")
@@ -106,9 +95,6 @@ struct ContentView: View {
         }
         .onDisappear { removeScrollMonitor() }
         .onChange(of: systemScheme) { _, new in theme.systemIsDark = (new == .dark) }
-        // 라이선스가 확정적으로 실효되면(환불·폐기·직접 해제) 열려 있던 Pro UI를 되돌린다.
-        // 시작 직후의 잠정 false에는 반응하지 않도록 전용 신호를 쓴다.
-        .onChange(of: license.proRevokedToken) { _, _ in store.revokeProFeatures() }
     }
 
     /// 뷰어 패널들과 터미널을 함께 배치한다. 터미널은 오른쪽(세로) 또는 아래(가로)에 붙는다.

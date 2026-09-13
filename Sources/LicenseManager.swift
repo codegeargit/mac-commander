@@ -1,28 +1,26 @@
 import Foundation
 import Security
 
-/// 라이선스(무료/Pro) 상태의 단일 출처.
-/// 키는 Keychain에 저장하고, 앱 시작 시 서버로 재검증한다.
-/// 오프라인·서버 오류 시엔 마지막 성공 시각 기준 유예 기간 동안 Pro를 유지한다.
+/// 후원자 키 상태의 단일 출처.
+///
+/// 후원자 키는 **기능을 잠그지 않는다.** 앱 기능은 키 유무와 무관하게 전부 무료이고,
+/// 키는 후원자 혜택을 여는 데만 쓴다. 키는 Keychain에 저장하고, 앱 시작 시 서버로 재검증한다.
+/// 오프라인·서버 오류 시엔 마지막 성공 시각 기준 유예 기간 동안 후원자 상태를 유지한다.
+///
+/// Keychain·UserDefaults의 저장 이름은 Pro 라이선스 시절의 것을 그대로 쓴다.
+/// 바꾸면 이미 활성화해 둔 키를 잃는다.
 @MainActor
 final class LicenseManager: ObservableObject {
     static let shared = LicenseManager()
 
-    /// 현재 Pro 활성 여부(기능 게이팅의 기준).
-    @Published private(set) var isPro: Bool = false
+    /// 유효한 후원자 키가 활성화돼 있는지(후원자 혜택의 기준).
+    @Published private(set) var isSupporter: Bool = false
     /// 마지막 검증 상태 메시지(UI 표시용).
     @Published private(set) var statusMessage: String = ""
     /// 검증 진행 중 여부(버튼 비활성/스피너용).
     @Published private(set) var isValidating: Bool = false
-    /// 저장된(활성화된) 라이선스 키. 없으면 nil.
+    /// 저장된(활성화된) 후원자 키. 없으면 nil.
     @Published private(set) var activeKey: String?
-
-    /// Pro 권한이 **확정적으로** 사라질 때마다 올라가는 값. 열려 있던 Pro UI를 회수하는 신호다.
-    ///
-    /// 서버가 명확히 무효라고 답했거나 사용자가 직접 해제한 경우만 올린다. 오프라인·서버 오류는
-    /// 유예 기간 정책에 맡기므로 포함하지 않는다. 시작 직후의 잠정 false도 아니다 —
-    /// 그때 회수하면 재검증이 끝나기 전에 정상 Pro 사용자의 패널과 터미널을 닫아 버린다.
-    @Published private(set) var proRevokedToken: Int = 0
 
     private let provider: LicenseProvider
     private let defaults = UserDefaults.standard
@@ -51,7 +49,7 @@ final class LicenseManager: ObservableObject {
     private static let keychainService = "ai.codegear.MacCommander.license"
     private static let keychainAccount = "licenseKey"
 
-    /// 오프라인/서버오류 시 Pro를 유지해 주는 유예 기간(마지막 성공 검증 이후).
+    /// 오프라인/서버오류 시 후원자 상태를 유지해 주는 유예 기간(마지막 성공 검증 이후).
     private static let offlineGrace: TimeInterval = 14 * 24 * 60 * 60  // 14일
 
     init(provider: LicenseProvider? = nil) {
@@ -67,30 +65,18 @@ final class LicenseManager: ObservableObject {
 
     // MARK: - 시작 시 복원/재검증
 
-    /// 앱 시작 시 호출. 개발 빌드는 항상 Pro. 저장된 키가 있으면 조용히 재검증한다.
+    /// 앱 시작 시 호출. 저장된 키가 있으면 조용히 재검증한다.
+    ///
+    /// 기능을 잠그지 않으므로 개발 빌드에서 후원자 상태를 강제로 켜 둘 이유가 없다.
+    /// 개발 빌드는 테스트 체크아웃·테스트 프록시로 실제 키 흐름을 그대로 확인한다.
     func restore() {
-        #if DEBUG
-        // 개발자 본인 로컬 빌드는 항상 Pro로 동작.
-        // 단 무료 동선(Pro 업셀)을 확인해야 할 때가 있어 환경변수로 끌 수 있게 둔다.
-        //   MC_FORCE_FREE=1 MacCommander.app/Contents/MacOS/MacCommander
-        //   (open(1)은 환경변수를 물려주지 않으므로 실행 파일을 직접 띄운다)
-        if ProcessInfo.processInfo.environment["MC_FORCE_FREE"] == nil {
-            isPro = true
-            statusMessage = "DEBUG: Pro 강제 활성"
-        } else {
-            isPro = false
-            statusMessage = "DEBUG: 무료 강제"
-        }
-        return
-        #else
         guard let key = activeKey, !key.isEmpty else {
-            isPro = false
+            isSupporter = false
             return
         }
-        // 우선 캐시(유예) 기준으로 Pro 여부를 잠정 결정한 뒤, 백그라운드 재검증.
-        isPro = withinOfflineGrace()
+        // 우선 캐시(유예) 기준으로 잠정 결정한 뒤, 백그라운드 재검증.
+        isSupporter = withinOfflineGrace()
         Task { await revalidate(key: key, silent: true) }
-        #endif
     }
 
     /// 유예 기간 안에 있는지(마지막 성공 검증 기준).
@@ -127,13 +113,13 @@ final class LicenseManager: ObservableObject {
             instanceId = instance
             defaults.set(Date(), forKey: Key.lastValidated)
             if let email { defaults.set(email, forKey: Key.cachedEmail) }
-            isPro = true
-            statusMessage = "Pro 활성화됨" + (email.map { " (\($0))" } ?? "")
+            isSupporter = true
+            statusMessage = "후원자 키가 활성화되었습니다. 고맙습니다!" + (email.map { " (\($0))" } ?? "")
         case .limitReached:
-            isPro = false
+            isSupporter = false
             statusMessage = "이 키는 이미 최대 기기 수만큼 사용 중입니다. 쓰지 않는 기기에서 해제한 뒤 다시 시도하세요."
         case .rejected(let reason):
-            isPro = false
+            isSupporter = false
             statusMessage = "유효하지 않은 키: \(reason)"
         case .unreachable(let reason):
             // 서버에 못 닿은 것뿐이므로 키를 버리지 않는다. 사용자가 다시 시도하면 된다.
@@ -150,23 +136,20 @@ final class LicenseManager: ObservableObject {
         switch await provider.validate(key: key, instanceId: instanceId) {
         case .valid:
             defaults.set(Date(), forKey: Key.lastValidated)
-            isPro = true
-            if !silent { statusMessage = "Pro 확인됨" }
+            isSupporter = true
+            if !silent { statusMessage = "후원자 키 확인됨" }
         case .invalid(let reason):
-            // 서버가 명확히 무효라고 하면 Pro 해제.
-            let wasPro = isPro
-            isPro = false
-            statusMessage = "라이선스 무효: \(reason)"
-            // Pro였다가 잃은 경우에만 열려 있던 Pro UI를 회수한다.
-            if wasPro { proRevokedToken += 1 }
+            // 서버가 명확히 무효라고 하면 후원자 상태 해제.
+            isSupporter = false
+            statusMessage = "후원자 키 무효: \(reason)"
         case .unreachable:
-            // 검증 불가면 유예 기간 동안 기존 Pro 유지.
-            isPro = withinOfflineGrace()
-            if !silent { statusMessage = "오프라인 — 유예 기간 동안 Pro 유지" }
+            // 검증 불가면 유예 기간 동안 기존 상태 유지.
+            isSupporter = withinOfflineGrace()
+            if !silent { statusMessage = "오프라인 — 유예 기간 동안 후원자 상태 유지" }
         }
     }
 
-    /// 라이선스 해제. 서버의 활성화 슬롯을 반납하고 이 기기를 무료로 되돌린다.
+    /// 후원자 키 해제. 서버의 활성화 슬롯을 반납하고 이 기기에서 키를 지운다.
     ///
     /// 서버 반납이 실패해도 로컬 해제는 진행한다. 사용자를 붙잡아 둘 이유가 없기 때문이다.
     /// 대신 슬롯이 남아 있을 수 있다는 사실을 알려서, 다른 기기가 막히면 원인을 알 수 있게 한다.
@@ -183,14 +166,9 @@ final class LicenseManager: ObservableObject {
         instanceId = nil
         defaults.removeObject(forKey: Key.lastValidated)
         defaults.removeObject(forKey: Key.cachedEmail)
-        #if DEBUG
-        isPro = true   // DEBUG는 계속 Pro
-        #else
-        isPro = false
-        proRevokedToken += 1   // 열려 있던 분할 패널·터미널을 되돌린다
-        #endif
+        isSupporter = false
         statusMessage = slotReleased
-            ? "라이선스가 해제되었습니다."
+            ? "후원자 키가 해제되었습니다."
             : "이 기기에서는 해제했지만 서버에 반납하지 못했습니다. 활성화 한도가 그대로일 수 있습니다."
     }
 

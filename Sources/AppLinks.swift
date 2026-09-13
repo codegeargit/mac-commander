@@ -11,11 +11,13 @@ enum AppLinks {
     static let githubSponsors = URL(string: "https://github.com/sponsors/codegeargit")!
     static let buyMeACoffee = URL(string: "https://buymeacoffee.com/codegear")!
 
-    /// Pro 구매(체크아웃) 주소. 없으면 구매 버튼이 아예 표시되지 않는다.
+    /// 후원자 키 결제(Creem 체크아웃) 주소. 없으면 결제 버튼과 후원자 키 섹션이 나오지 않는다.
+    ///
+    /// 후원자 키는 기능을 잠그지 않는다. 앱 기능은 이 값과 무관하게 전부 무료다.
     ///
     /// Creem은 테스트와 라이브의 상품이 별개라 주소가 다르다. 테스트 링크가 실판매 빌드에
-    /// 섞이면 고객이 테스트 카드로 결제하고 아무것도 못 받는 사고가 나므로 빌드별로 분리한다.
-    static let proCheckout: URL? = {
+    /// 섞이면 후원자가 테스트 카드로 결제하고 아무것도 못 받는 사고가 나므로 빌드별로 분리한다.
+    static let supporterCheckout: URL? = {
         #if DEBUG
         return URL(string: "https://www.creem.io/test/payment/prod_5iWRKUMyFQgMtgZjEozSh4")
         #else

@@ -100,7 +100,7 @@ struct MacCommanderApp: App {
                     .keyboardShortcut(KeyEquivalent("\u{F70B}"), modifiers: [])
                     .disabled(store.cursorURL == nil)
                 Divider()
-                Button(proLabel(.mrtMenu)) { store.openMultiRename() }
+                Button(loc.string(.mrtMenu)) { store.openMultiRename() }
                     .keyboardShortcut("r", modifiers: .command)
                     .disabled(store.cursorURL == nil && store.markedCount == 0)
             }
@@ -113,7 +113,7 @@ struct MacCommanderApp: App {
                 Button(loc.string(.menuFontDefault)) { store.resetFont() }
                     .keyboardShortcut("0", modifiers: .command)
                 Divider()
-                Button(proLabel(.toggleTerminal)) { store.toggleTerminal() }
+                Button(loc.string(.toggleTerminal)) { store.toggleTerminal() }
                     .keyboardShortcut("`", modifiers: .control)
                 Button(loc.string(store.terminalPosition == .bottom
                                   ? .terminalMoveRight : .terminalMoveBottom)) {
@@ -121,7 +121,7 @@ struct MacCommanderApp: App {
                 }
                 .disabled(!store.showTerminal)
                 Divider()
-                Button(proLabel(.menuAddPanel)) { store.addPanel() }
+                Button(loc.string(.menuAddPanel)) { store.addPanel() }
                     .keyboardShortcut("+", modifiers: [.command, .control])
                     .disabled(!store.canAddPanel)
                 Button(loc.string(.menuRemovePanel)) { store.removeActivePanel() }
@@ -146,18 +146,16 @@ struct MacCommanderApp: App {
                 Divider()
             }
             SidebarCommands()
-            // Help 메뉴: 키보드 단축키 + 지원 파일 형식 + 오픈소스 고지 + 업데이트 확인.
+            // Help 메뉴: 키보드 단축키 + 지원 파일 형식 + 오픈소스 고지 + 후원 + 업데이트 확인.
             CommandGroup(replacing: .help) {
                 Button(loc.string(.shortcutsMenu)) { store.showShortcuts = true }
                     .keyboardShortcut("/", modifiers: .command)
                 Button(loc.string(.fileTypesMenu)) { store.showFileTypes = true }
                 Button(loc.string(.ackMenu)) { store.showAcknowledgements = true }
                 Divider()
-                // 게이팅 전에는 안내할 Pro가 없다. 팔지도 않는 걸 광고하지 않는다.
-                if ProFeature.gatingEnabled {
-                    Button(loc.string(.proMenu)) { store.showProInfo = true }
-                    Divider()
-                }
+                // 모든 기능이 무료라 막힌 기능에서 후원으로 이어지는 길이 없다. 메뉴에 진입점을 둔다.
+                Button(loc.string(.supportMenu)) { NSWorkspace.shared.open(AppLinks.githubSponsors) }
+                Divider()
                 CheckForUpdatesView(updater: updater.updater,
                                     title: loc.string(.menuCheckForUpdates))
             }
@@ -170,14 +168,6 @@ struct MacCommanderApp: App {
                 .environmentObject(theme)
                 .environmentObject(license)
         }
-    }
-
-    /// Pro 전용 메뉴 항목의 라벨. 무료 사용자에게만 "(Pro)"를 붙여
-    /// 눌러보기 전에 유료 기능임을 알 수 있게 한다.
-    private func proLabel(_ key: L10n) -> String {
-        // 게이팅이 꺼져 있으면 실제로는 누구나 쓸 수 있으므로 (Pro) 표시가 거짓말이 된다.
-        guard ProFeature.gatingEnabled, !license.isPro else { return loc.string(key) }
-        return "\(loc.string(key)) (\(loc.string(.proSuffix)))"
     }
 
     /// macOS 표준 About 패널을 만든이 크레딧과 함께 띄운다.

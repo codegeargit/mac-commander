@@ -208,20 +208,23 @@ enum L10n {
     case language
     case colorTheme
 
-    // 라이선스 (Pro)
     // 환경설정 › 파일 접근 권한
     case accessSection
     case accessBody
     case accessOpenSettings
     case accessRestartHint
 
-    case licenseSection      // 환경설정 섹션 제목
+    // 환경설정 › 후원 · 후원자 키
+    case licenseSection      // 환경설정 섹션 제목: 후원자 키
     case licenseKeyField     // 키 입력 필드 라벨/플레이스홀더
     case licenseActivate     // 활성화 버튼
     case licenseDeactivate   // 해제 버튼
     case licenseRefresh      // 재확인 버튼
-    case licenseStatusPro    // 상태: Pro 활성
-    case licenseStatusFree   // 상태: 무료
+    case licenseStatusActive // 상태: 후원자 키 활성
+    case licenseStatusNone   // 상태: 후원자 키 없음
+    case supporterKeyGet     // 후원자 키 결제(체크아웃) 링크
+    case supporterKeyHint    // 후원자 키 섹션 안내 문구
+    case supportMenu         // 도움말 메뉴: 후원하기
     case supportSection      // 후원 섹션 제목
     case githubSponsors      // GitHub Sponsors 링크 라벨
     case buyMeCoffee         // Buy Me a Coffee 링크 라벨
@@ -287,21 +290,6 @@ enum L10n {
     case blogLink            // 블로그 링크 라벨
     case sourceCodeLink      // 소스 코드(GitHub) 링크 라벨
 
-    // Pro 기능 안내(업셀 시트)
-    case proMenu               // 도움말 메뉴: Pro 기능 안내 열기
-    case proTitle              // 시트 제목
-    case proIntro              // 메뉴에서 직접 열었을 때(특정 기능이 막힌 게 아닐 때) 첫 문장
-    case proIncludes           // "Pro에 포함된 기능" 소제목
-    case proOpenSettings       // 환경설정으로 이동 버튼
-    case proBuy                // 체크아웃 열기 버튼
-    case proMultiPanel         // 기능 이름: 뷰어 패널 분할
-    case proMultiPanelDetail
-    case proTerminal           // 기능 이름: 내장 터미널
-    case proTerminalDetail
-    case proMultiRename        // 기능 이름: 멀티 리네임
-    case proMultiRenameDetail
-    case proSuffix             // 메뉴 라벨에 붙이는 표시
-
     // 오픈소스 고지 (Help ▸ 오픈소스 라이선스)
     case ackMenu             // Help 메뉴 항목
     case ackTitle            // 시트 제목
@@ -309,7 +297,6 @@ enum L10n {
     case ackMissingText      // 라이선스 전문을 못 읽었을 때
 
     // 동적 메시지(인자 포함)
-    case proBlocked(String)  // "OOO은(는) Pro 기능입니다."
     case confirmDelete(String)
     case confirmDeleteMulti(Int)
     case cannotReadFile
@@ -516,17 +503,24 @@ enum L10n {
             ko = "권한을 바꾼 뒤에는 앱을 다시 시작해야 반영될 수 있습니다."
             en = "You may need to restart the app after changing this."
 
-        case .licenseSection:   ko = "라이선스"; en = "License"
-        case .licenseKeyField:  ko = "라이선스 키"; en = "License Key"
+        case .licenseSection:   ko = "후원자 키"; en = "Supporter Key"
+        case .licenseKeyField:  ko = "후원자 키"; en = "Supporter Key"
         case .licenseActivate:  ko = "활성화"; en = "Activate"
         case .licenseDeactivate: ko = "해제"; en = "Deactivate"
         case .licenseRefresh:   ko = "재확인"; en = "Refresh"
-        case .licenseStatusPro: ko = "Pro 활성"; en = "Pro active"
-        case .licenseStatusFree: ko = "무료 버전"; en = "Free version"
+        case .licenseStatusActive: ko = "후원자 키 활성 — 고맙습니다!"; en = "Supporter key active — thank you!"
+        case .licenseStatusNone: ko = "후원자 키 없음"; en = "No supporter key"
+        case .supporterKeyGet:  ko = "후원자 키 받기"; en = "Get a Supporter Key"
+        case .supporterKeyHint:
+            ko = "후원자 키가 없어도 모든 기능을 쓸 수 있습니다. 후원자 혜택은 차례로 추가됩니다."
+            en = "Every feature works without a supporter key. Supporter perks will be added over time."
+        case .supportMenu:      ko = "Mac Commander 후원하기…"; en = "Sponsor Mac Commander…"
         case .supportSection:   ko = "후원"; en = "Support"
         case .githubSponsors:   ko = "💖 GitHub Sponsors로 후원하기"; en = "💖 Sponsor on GitHub"
         case .buyMeCoffee:      ko = "☕️ 커피 한 잔 후원하기"; en = "☕️ Buy me a coffee"
-        case .supportHint:      ko = "개발에 도움이 됩니다. 감사합니다!"; en = "It helps development. Thank you!"
+        case .supportHint:
+            ko = "Mac Commander의 모든 기능은 무료입니다. 후원은 개발을 이어가는 힘이 됩니다."
+            en = "Every feature of Mac Commander is free. Sponsorship keeps development going."
 
         case .shortcutsMenu:    ko = "키보드 단축키"; en = "Keyboard Shortcuts"
         case .menuCheckForUpdates: ko = "업데이트 확인…"; en = "Check for Updates…"
@@ -595,28 +589,6 @@ enum L10n {
         case .blogLink:         ko = "블로그"; en = "Blog"
         case .sourceCodeLink:   ko = "소스 코드"; en = "Source Code"
 
-        case .proMenu:          ko = "Pro 기능 안내…"; en = "About Pro Features…"
-        case .proTitle:         ko = "Pro 기능"; en = "Pro Feature"
-        case .proIntro:
-            ko = "무료 버전에서 트리 탐색, 뷰어, 편집과 저장, 파일 관리를 모두 쓸 수 있습니다. Pro는 아래 세 가지를 더 엽니다."
-            en = "The free version includes tree browsing, the viewer, editing and saving, and file management. Pro adds these three."
-        case .proIncludes:      ko = "PRO에 포함된 기능"; en = "INCLUDED IN PRO"
-        case .proOpenSettings:  ko = "라이선스 키 입력…"; en = "Enter License Key…"
-        case .proBuy:           ko = "Pro 구매하기"; en = "Buy Pro"
-        case .proMultiPanel:    ko = "뷰어 패널 분할"; en = "Split Viewer Panels"
-        case .proMultiPanelDetail:
-            ko = "문서를 최대 3개까지 나란히 놓고 비교합니다."
-            en = "Compare up to three documents side by side."
-        case .proTerminal:      ko = "내장 터미널"; en = "Built-in Terminal"
-        case .proTerminalDetail:
-            ko = "보고 있는 폴더에서 셸을 열고 Claude Code를 실행합니다."
-            en = "Open a shell in the current folder and launch Claude Code."
-        case .proMultiRename:   ko = "멀티 리네임"; en = "Multi-Rename"
-        case .proMultiRenameDetail:
-            ko = "여러 파일 이름을 규칙으로 한 번에 바꿉니다."
-            en = "Rename many files at once with a rule."
-        case .proSuffix:        ko = "Pro"; en = "Pro"
-
         case .ackMenu:          ko = "오픈소스 라이선스…"; en = "Open Source Licenses…"
         case .ackTitle:         ko = "오픈소스 라이선스"; en = "Open Source Licenses"
         case .ackFootnote:
@@ -624,9 +596,6 @@ enum L10n {
             en = "Some components bundle additional open source software. See each project's page for the full list."
         case .ackMissingText:   ko = "(라이선스 전문을 찾을 수 없습니다)"; en = "(License text not found)"
 
-        case .proBlocked(let feature):
-            ko = "'\(feature)'은(는) Pro 기능입니다. 무료 버전에서는 트리 탐색, 뷰어 1개, 편집과 저장, 파일 관리를 모두 쓸 수 있습니다."
-            en = "\"\(feature)\" is a Pro feature. The free version includes tree browsing, one viewer, editing and saving, and file management."
         case .confirmDelete(let name):
             ko = "'\(name)'을(를) 휴지통으로 이동할까요?"
             en = "Move \"\(name)\" to the Trash?"

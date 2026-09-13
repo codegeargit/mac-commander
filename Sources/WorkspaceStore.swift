@@ -273,9 +273,7 @@ final class WorkspaceStore: ObservableObject {
     }
 
     /// 터미널 패널 표시/숨김 토글(단축키·버튼용).
-    /// 여는 것만 Pro다. 이미 열려 있으면 무료 사용자도 언제든 닫을 수 있어야 한다.
     func toggleTerminal() {
-        if !showTerminal, !requirePro(.terminal) { return }
         showTerminal.toggle()
     }
 
@@ -293,7 +291,6 @@ final class WorkspaceStore: ObservableObject {
     /// 터미널이 이미 열려 있으면 실행 중인 셸에 바로 명령을 주입하고,
     /// 닫혀 있으면 터미널을 연 뒤 셸이 준비되면 주입되도록 예약한다.
     func launchClaudeCode() {
-        guard requirePro(.terminal) else { return }
         let command = "claude --permission-mode auto"
         if showTerminal, let sink = terminalCommandSink {
             sink(command)
@@ -1122,7 +1119,6 @@ final class WorkspaceStore: ObservableObject {
         guard renamingURL == nil else { return }
         let targets = actionTargetURLs
         guard !targets.isEmpty else { return }
-        guard requirePro(.multiRename) else { return }
         renameTargets = targets
         showMultiRename = true
     }
@@ -1719,51 +1715,14 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
-    // MARK: - Pro 기능 게이팅
-
-    /// 업셀 시트에 띄울 기능. nil이면 시트가 닫힌 상태.
-    @Published var upsellFeature: ProFeature?
-
-    /// Pro 소개 시트 표시 여부(도움말 메뉴에서 직접 연다).
-    /// 잠긴 기능을 눌러야만 Pro를 볼 수 있으면 존재 자체를 모르므로 진입점을 따로 둔다.
-    @Published var showProInfo: Bool = false
-
-    /// Pro 기능을 실행해도 되는지 판단한다.
-    /// 무료 사용자면 업셀 시트를 띄우고 false를 돌려주므로, 호출부는 그대로 return하면 된다.
-    ///
-    /// 세션 복원 경로(`setPanelCount`, `showTerminal` 복원)에는 일부러 걸지 않는다.
-    /// 앱 시작 시점에는 라이선스 재검증이 아직 끝나지 않아 isPro가 false일 수 있어,
-    /// 여기서 막으면 정상 Pro 사용자의 패널이 접히거나 터미널이 닫혀 버린다.
-    func requirePro(_ feature: ProFeature) -> Bool {
-        // 아직 살 곳이 없으면 막지 않는다. 판단 근거는 ProFeature.gatingEnabled 주석 참고.
-        if !ProFeature.gatingEnabled { return true }
-        if LicenseManager.shared.isPro { return true }
-        upsellFeature = feature
-        return false
-    }
-
     // MARK: - 패널 개수 조정
 
     var canAddPanel: Bool { panels.count < Self.maxPanels }
     var canRemovePanel: Bool { panels.count > 1 }
 
-    /// Pro 권한이 사라진 것이 확정됐을 때, 열려 있던 Pro 기능을 되돌린다.
-    ///
-    /// 앱이 뜰 때 무조건 접지 않는 이유가 있다. 시작 직후에는 라이선스 재검증이 끝나지 않아
-    /// `isPro`가 잠시 false다. 그때 접으면 정상 Pro 사용자의 분할 패널이 접히고 터미널이 닫힌다.
-    /// 그래서 서버가 무효라고 답했거나 사용자가 직접 해제한 순간에만 호출한다.
-    func revokeProFeatures() {
-        // 게이팅이 꺼져 있으면(살 수 있는 경로가 없으면) 애초에 누구나 쓰는 기능이다. 회수하지 않는다.
-        guard ProFeature.gatingEnabled else { return }
-        if panels.count > 1 { setPanelCount(1) }
-        if showTerminal { showTerminal = false }
-        showMultiRename = false
-    }
-
     /// 패널 추가(활성 패널 오른쪽에 빈 패널). 새 패널은 평균 폭으로.
     func addPanel() {
         guard canAddPanel else { return }
-        guard requirePro(.multiPanel) else { return }
         let insertAt = activePanelIndex + 1
         panels.insert(ViewerPanel(), at: insertAt)
         let avg = panelWeights.reduce(0, +) / CGFloat(panelWeights.count)
