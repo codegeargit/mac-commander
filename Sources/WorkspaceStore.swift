@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// 뷰어에 내려보내는 문서 내 검색 요청.
 ///
@@ -33,6 +34,8 @@ struct RecentFolder: Codable, Identifiable, Equatable {
 struct ViewerPanel: Identifiable {
     let id = UUID()
     var fileURL: URL?
+    /// 이 파일을 연 트리(`TreePane.id`). 듀얼 모드에서 열린 파일 강조를 그 트리에만 두려고 기억한다.
+    var sourcePaneID: UUID?
     /// 디스크에 저장된 본문(렌더링 및 dirty 판정의 기준).
     var content: String?
     /// 편집 모드 여부. true면 TextEditor, false면 마크다운 렌더링.
@@ -111,19 +114,81 @@ struct ViewerPanel: Identifiable {
     }
 }
 
+/// F5·F6으로 반대편 트리에 복사·이동하기 전 확인 대기 중인 작업.
+struct TransferRequest: Identifiable {
+    let id = UUID()
+    /// 보내는 쪽 트리 번호(0=왼쪽, 1=오른쪽). 확인 창에서 방향을 바꾸면 뒤집힌다.
+    var sourcePaneIndex: Int
+    /// 옮길 항목(트리 표시 순서). 확인 창에서 방향을 바꾸면 반대편 트리의 항목으로 바뀐다.
+    var sources: [URL]
+    /// true면 이동(F6), false면 복사(F5).
+    let isMove: Bool
+    /// 대상 폴더 경로. 확인 창에서 고칠 수 있다.
+    var destinationPath: String
+}
+
 /// 앱의 작업 상태(루트 폴더, 트리, 뷰어 패널들)와 세션 영속화를 담당.
 @MainActor
 final class WorkspaceStore: ObservableObject {
-    /// 루트 폴더 노드(없으면 폴더 미선택 상태).
-    @Published var root: FileNode? {
-        didSet {
-            guard oldValue?.url != root?.url else { return }
-            startWatchingRoot()
+    // MARK: - 트리 창 (듀얼 모드)
+
+    /// 트리 창들. 0번은 늘 보이는 기본 트리, 1번은 듀얼 모드에서만 보이는 두 번째 트리.
+    /// 좌우 바꾸기(⌃U)에서 순서를 맞바꾸므로 배열 자체를 게시한다.
+    @Published private(set) var panes: [TreePane] = [TreePane(), TreePane()]
+
+    /// 두 번째 트리를 보여 주는지(Total Commander식 듀얼 모드).
+    @Published private(set) var isDualPane: Bool = false {
+        didSet { defaults.set(isDualPane, forKey: Key.dualPane) }
+    }
+
+    /// 키 입력·파일 작업이 향하는 트리(0 또는 1). 듀얼 모드가 아니면 늘 0번을 쓴다.
+    @Published private(set) var activePaneIndex: Int = 0 {
+        didSet { defaults.set(activePaneIndex, forKey: Key.activeTreePane) }
+    }
+
+    /// 지금 작업 대상인 트리.
+    var activePane: TreePane { panes[isDualPane ? activePaneIndex : 0] }
+    /// 늘 보이는 기본 트리.
+    var primaryPane: TreePane { panes[0] }
+    /// 듀얼 모드에서 활성 트리의 반대편 트리. 듀얼 모드가 아니면 nil.
+    var otherPane: TreePane? { isDualPane ? panes[1 - activePaneIndex] : nil }
+
+    private var paneSubscriptions: [AnyCancellable] = []
+
+    init() {
+        for pane in panes {
+            // 트리 상태가 바뀌면 스토어를 관찰하는 화면(메뉴·상태바·F키 등)도 다시 그린다.
+            pane.objectWillChange
+                .sink { [weak self] _ in self?.objectWillChange.send() }
+                .store(in: &paneSubscriptions)
+            pane.onExternalChange = { [weak self] pane in
+                self?.handleExternalChange(in: pane)
+            }
         }
     }
 
-    /// 루트 하위 트리의 외부(Finder 등) 변경을 감시해 트리를 자동 갱신한다.
-    private var directoryWatcher: DirectoryWatcher?
+    // 기존 코드는 트리가 하나라고 가정하고 아래 이름들을 쓴다. 활성 트리로 이어 준다.
+
+    /// 활성 트리의 루트 폴더 노드(없으면 폴더 미선택 상태).
+    var root: FileNode? {
+        get { activePane.root }
+        set { activePane.root = newValue }
+    }
+    /// 활성 트리의 펼쳐진 폴더 URL 집합.
+    var expandedURLs: Set<URL> {
+        get { activePane.expandedURLs }
+        set { activePane.expandedURLs = newValue }
+    }
+    /// 활성 트리의 키보드 탐색 커서.
+    var cursorURL: URL? {
+        get { activePane.cursorURL }
+        set { activePane.cursorURL = newValue }
+    }
+    /// 활성 트리의 다중 선택(Total Commander 스타일, Space/Insert로 토글).
+    var markedURLs: Set<URL> {
+        get { activePane.markedURLs }
+        set { activePane.markedURLs = newValue }
+    }
 
     /// 우측 뷰어 패널들(1~maxPanels). 가로로 나란히 표시.
     @Published var panels: [ViewerPanel] = [ViewerPanel()]
@@ -132,15 +197,7 @@ final class WorkspaceStore: ObservableObject {
     /// 각 패널의 폭 비율(가중치). panels와 길이 일치, 합으로 정규화해 사용.
     @Published var panelWeights: [CGFloat] = [1]
 
-    /// 펼쳐진 폴더 URL 집합(트리 펼침 상태의 단일 출처).
-    @Published var expandedURLs: Set<URL> = []
-    /// 키보드 탐색 커서가 가리키는 노드 URL.
-    @Published var cursorURL: URL?
-    /// 다중 선택된 노드 URL 집합(Total Commander 스타일, Space/Insert로 토글).
-    /// 커서(cursorURL)와는 독립적. 비어 있으면 단일 선택 모드(커서 항목만 대상).
-    @Published var markedURLs: Set<URL> = []
-
-    /// 키보드 포커스 영역: 트리 또는 특정 뷰어 패널.
+    /// 키보드 포커스 영역: 트리(듀얼 모드면 활성 트리) 또는 특정 뷰어 패널.
     enum Focus: Equatable {
         case tree
         case panel(Int)
@@ -239,6 +296,11 @@ final class WorkspaceStore: ObservableObject {
         didSet { defaults.set(Double(treeWidth), forKey: Key.treeWidth) }
     }
 
+    /// 두 번째 트리 폭 — 기본 트리와 따로 기억한다.
+    @Published var secondTreeWidth: CGFloat = 280 {
+        didSet { defaults.set(Double(secondTreeWidth), forKey: Key.secondTreeWidth) }
+    }
+
     /// 오른쪽에 붙였을 때의 터미널 폭.
     @Published var terminalWidth: CGFloat = 420 {
         didSet { defaults.set(Double(terminalWidth), forKey: Key.terminalWidth) }
@@ -256,6 +318,10 @@ final class WorkspaceStore: ObservableObject {
 
     func setTreeWidth(_ width: CGFloat) {
         treeWidth = min(max(width, Self.minTreeWidth), Self.maxTreeWidth)
+    }
+
+    func setSecondTreeWidth(_ width: CGFloat) {
+        secondTreeWidth = min(max(width, Self.minTreeWidth), Self.maxTreeWidth)
     }
 
     func setTerminalWidth(_ width: CGFloat, limit: CGFloat) {
@@ -350,7 +416,7 @@ final class WorkspaceStore: ObservableObject {
             guard oldValue != showAllFiles else { return }
             FileNode.showAllFiles = showAllFiles
             defaults.set(showAllFiles, forKey: Key.showAllFiles)
-            rescanAll()
+            panes.forEach { $0.rescanAll() }
             // 인덱스 범위(표시 필터)가 달라졌으니 검색도 다시 훑어야 한다.
             fileIndex.markStale()
         }
@@ -363,7 +429,7 @@ final class WorkspaceStore: ObservableObject {
             FileNode.sortOrder = sortOrder
             defaults.set(sortOrder.field.rawValue, forKey: Key.sortField)
             defaults.set(sortOrder.ascending, forKey: Key.sortAscending)
-            rescanAll()
+            panes.forEach { $0.rescanAll() }
         }
     }
 
@@ -401,6 +467,11 @@ final class WorkspaceStore: ObservableObject {
         static let recentFolders = "session.recentFolders"
         static let sortField = "tree.sortField"
         static let sortAscending = "tree.sortAscending"
+        // 듀얼 모드(두 번째 트리)
+        static let dualPane = "ui.dualPane"
+        static let activeTreePane = "session.activeTreePane"
+        static let secondRootBookmark = "session.secondRootBookmark"
+        static let secondTreeWidth = "ui.secondTreeWidth"
     }
 
     // MARK: - 최근 폴더 / 복원 실패
@@ -480,9 +551,6 @@ final class WorkspaceStore: ObservableObject {
         defaults.removeObject(forKey: Key.recentFolders)
     }
 
-    /// 보안 스코프 접근을 유지 중인 루트 URL(stop을 위해 보관).
-    private var accessedRootURL: URL?
-
     // MARK: - 폴더 열기
 
     /// NSOpenPanel로 폴더를 선택해 워크스페이스로 연다(메뉴 ⌘O·빈 화면 공용).
@@ -538,7 +606,7 @@ final class WorkspaceStore: ObservableObject {
         if !FileNode.defaultVisibleExtensions.contains(ext) && !showAllFiles {
             showAllFiles = true
         }
-        // 뷰어에 열면서 커서 선택·트리 펼침(revealInTree)까지 한번에 처리한다.
+        // 뷰어에 열면서 커서 선택·트리 펼침까지 한번에 처리한다.
         openMarkdown(at: fileURL, inPanel: activePanelIndex)
         return true
     }
@@ -555,32 +623,28 @@ final class WorkspaceStore: ObservableObject {
         return entries.first { $0.path.precomposedStringWithCanonicalMapping == target }
     }
 
-    /// 사용자가 고른 폴더를 루트로 설정하고 트리를 스캔한다.
+    /// 사용자가 고른 폴더를 활성 트리의 루트로 설정하고 트리를 스캔한다.
     /// 보안 스코프 북마크를 저장해 다음 실행 때 권한을 복원한다.
     func openFolder(_ url: URL) {
-        stopAccessingRoot()
-
-        guard url.startAccessingSecurityScopedResource() else {
+        let pane = activePane
+        guard pane.startAccessing(url) else {
             // 직접 선택한 경우 보통 접근 가능하지만, 실패하면 왜 안 열렸는지 알려준다.
             restoreFailure = RestoreFailure(path: url.path)
             return
         }
-        accessedRootURL = url
         restoreFailure = nil
+        pane.setRoot(url)
 
-        let node = FileNode(url: url, isDirectory: true)
-        node.loadChildrenIfNeeded()
-        root = node
-
-        // 패널 초기화(1개, 빈 상태)
-        panels = [ViewerPanel()]
-        panelWeights = [1]
-        activePanelIndex = 0
-        expandedURLs = []
-        cursorURL = node.children?.first?.url
+        // 기본 트리에서 새 작업 폴더를 열면 뷰어도 새로 시작한다.
+        // 두 번째 트리는 옆 폴더를 잠깐 들여다보는 용도라 열린 문서를 건드리지 않는다.
+        if pane === primaryPane {
+            panels = [ViewerPanel()]
+            panelWeights = [1]
+            activePanelIndex = 0
+        }
         focus = .tree
 
-        saveRootBookmark(url)
+        saveRootBookmark(for: pane)
         rememberRecentFolder(url)
         persistOpenedFiles()
     }
@@ -593,17 +657,11 @@ final class WorkspaceStore: ObservableObject {
         // 이미 접근 중인 루트의 하위인지 확인(권한 상속 범위).
         guard let root, node.url.path.hasPrefix(root.url.path) else { return }
 
-        let newRoot = FileNode(url: node.url, isDirectory: true)
-        newRoot.loadChildrenIfNeeded()
-        self.root = newRoot
-
-        // 진입한 폴더 기준으로 펼침/커서를 정리.
-        expandedURLs = []
-        cursorURL = newRoot.children?.first?.url
-        markedURLs = []
+        // 진입한 폴더 기준으로 펼침/커서/선택을 정리.
+        activePane.setRoot(node.url)
         focus = .tree
 
-        saveRootBookmark(node.url)
+        saveRootBookmark(for: activePane)
         persistOpenedFiles()
     }
 
@@ -621,30 +679,24 @@ final class WorkspaceStore: ObservableObject {
               (try? FileManager.default.contentsOfDirectory(atPath: parentURL.path)) != nil
         else { return false }
 
-        // 보안 스코프 접근을 부모로 전환.
-        stopAccessingRoot()
-        if parentURL.startAccessingSecurityScopedResource() {
-            accessedRootURL = parentURL
-        }
+        // 보안 스코프 접근을 부모로 전환(실패해도 읽기는 이미 확인했으므로 진행한다).
+        let pane = activePane
+        pane.startAccessing(parentURL)
 
         let previousRootURL = current.url
-        let node = FileNode(url: parentURL, isDirectory: true)
-        node.loadChildrenIfNeeded()
-        root = node
+        pane.setRoot(parentURL)
 
         // 이전 루트 폴더를 펼친 상태로 두고 커서를 거기에 둔다.
-        if let prev = node.children?.first(where: { $0.url == previousRootURL }) {
+        if let prev = pane.root?.children?.first(where: { $0.url == previousRootURL }) {
             if prev.isDirectory {
                 prev.loadChildrenIfNeeded()
-                expandedURLs.insert(prev.url)
+                pane.expandedURLs.insert(prev.url)
             }
-            cursorURL = prev.url
-        } else {
-            cursorURL = node.children?.first?.url
+            pane.cursorURL = prev.url
         }
         focus = .tree
 
-        saveRootBookmark(parentURL)
+        saveRootBookmark(for: pane)
         return true
     }
 
@@ -672,11 +724,7 @@ final class WorkspaceStore: ObservableObject {
     /// 루트가 더 상위로 올라갈 수 있는지(버튼 활성화용).
     /// 파일시스템 최상위("/")가 아니면 항상 활성 — 권한이 없어도 버튼을 누르면
     /// NSOpenPanel 폴백으로 부모를 선택할 수 있게 한다(goToParentOrPrompt).
-    var canGoToParent: Bool {
-        guard let current = root else { return false }
-        let parent = current.url.deletingLastPathComponent()
-        return parent != current.url
-    }
+    var canGoToParent: Bool { activePane.canGoToParent }
 
     // MARK: - 경로 복사 (VSCode 스타일)
 
@@ -765,9 +813,12 @@ final class WorkspaceStore: ObservableObject {
         panels[index].isConverting = false
         // 이 문서를 전에 QuickLook으로 보기로 골랐다면 그대로 이어 간다.
         panels[index].prefersQuickLook = isRich && quickLookPreferred.contains(url)
+        // 파일이 든 트리가 이 문서의 주인이 된다. 그 트리에서만 커서를 옮기고 강조한다.
+        let owner = treePane(containing: url)
+        panels[index].sourcePaneID = owner.id
         activePanelIndex = index
-        cursorURL = url
-        revealInTree(url)
+        owner.cursorURL = url
+        owner.reveal(url)
         persistOpenedFiles()
         // 캐시가 없으면 QuickLook을 먼저 보여주면서 뒤에서 변환한다.
         startConversionIfNeeded(panel: index)
@@ -1073,16 +1124,8 @@ final class WorkspaceStore: ObservableObject {
         cursorURL = url
     }
 
-    /// 현재 작업(복사/삭제 등) 대상 URL 목록.
-    /// 선택된 항목이 있으면 그 전체, 없으면 커서 항목 1개.
-    /// 트리 표시 순서(visibleNodes)를 따라 안정적으로 정렬해 반환한다.
-    var actionTargetURLs: [URL] {
-        if !markedURLs.isEmpty {
-            return visibleNodes.map { $0.url }.filter { markedURLs.contains($0) }
-        }
-        if let c = cursorURL { return [c] }
-        return []
-    }
+    /// 활성 트리의 작업(복사/삭제 등) 대상 URL 목록.
+    var actionTargetURLs: [URL] { activePane.actionTargetURLs }
 
     /// 선택 개수(상태 표시용). 선택이 없으면 0.
     var markedCount: Int { markedURLs.count }
@@ -1158,9 +1201,9 @@ final class WorkspaceStore: ObservableObject {
             }
         }
 
-        // 영향받은 폴더 재스캔 + 열린 패널/펼침/커서 경로 이전.
+        // 영향받은 폴더 재스캔 + 열린 패널/펼침/커서 경로 이전(두 트리 모두).
         let dirs = Set(renamed.map { $0.from.deletingLastPathComponent() })
-        for dir in dirs { rescanDirectory(dir) }
+        for dir in dirs { rescanDirectoryInAllPanes(dir) }
         for r in renamed { migratePaths(from: r.from, to: r.to) }
 
         objectWillChange.send()
@@ -1199,9 +1242,16 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
-    /// F5 복사: 작업 대상(선택 전체 또는 커서 1개)을 각자 같은 폴더에 "사본"으로 복제.
+    /// F5 복사.
+    /// - 듀얼 모드: 한 트리에서 고른 항목을 다른 트리에서 고른 폴더로 복사한다(확인 창).
+    ///   어느 쪽이 보내는 쪽인지는 `transferSourcePaneIndex`가 정한다.
+    /// - 트리 하나: 각자 같은 폴더에 "사본"으로 복제한다.
     func fkeyCopyAtCursor() {
         guard renamingURL == nil else { return }
+        if isDualPane {
+            requestTransfer(isMove: false)
+            return
+        }
         let targets = actionTargetURLs
         guard !targets.isEmpty else { return }
         for url in targets {
@@ -1210,10 +1260,256 @@ final class WorkspaceStore: ObservableObject {
         clearMarks()
     }
 
-    /// F6 이름변경: 커서 항목 인라인 이름 편집 시작.
+    /// F6.
+    /// - 듀얼 모드: 한 트리에서 고른 항목을 다른 트리에서 고른 폴더로 이동한다(확인 창).
+    /// - 트리 하나: 커서 항목 인라인 이름 편집을 시작한다.
     func fkeyRenameAtCursor() {
+        guard renamingURL == nil else { return }
+        if isDualPane {
+            requestTransfer(isMove: true)
+            return
+        }
+        fkeyRenameInPlace()
+    }
+
+    /// ⇧F6: 모드와 상관없이 커서 항목의 이름을 그 자리에서 바꾼다.
+    func fkeyRenameInPlace() {
         guard renamingURL == nil, let node = node(for: cursorURL) else { return }
         beginRename(node)
+    }
+
+    // MARK: - 반대편 트리로 복사·이동 (F5·F6, 듀얼 모드)
+
+    /// 확인 창에 띄울 복사·이동 작업. nil이면 창이 닫힌 상태.
+    @Published var pendingTransfer: TransferRequest?
+
+    /// F5·F6에서 보내는 쪽 트리의 번호(0=왼쪽, 1=오른쪽). 트리가 하나거나 보낼 항목이 없으면 nil.
+    ///
+    /// 사용자는 보통 **보낼 파일을 먼저 고르고, 반대편에서 받을 폴더를 고른 뒤** F5·F6을 누른다.
+    /// 그래서 기본은 "먼저 고른 쪽(비활성 트리)이 보내고, 마지막에 누른 쪽(활성 트리)이 받는다"이다.
+    /// 다만 같은 폴더로 파일을 여러 번 보낼 때는 받을 폴더를 그대로 두고 파일만 바꿔 고르므로,
+    /// 무엇을 골랐는지를 먼저 본다.
+    /// 1. 한쪽에만 다중 선택이 있으면 그 트리가 보낸다.
+    /// 2. 한쪽 커서만 파일이면 그 트리가 보낸다(파일은 받는 폴더가 될 수 없다).
+    /// 3. 그 밖에는 먼저 고른 쪽(비활성 트리)이 보낸다.
+    func transferSourcePaneIndex() -> Int? {
+        guard isDualPane else { return nil }
+        let active = activePaneIndex, other = 1 - activePaneIndex
+        let a = panes[active], o = panes[other]
+        // 보낼 것이 한쪽에만 있으면 그쪽이다.
+        switch (a.actionTargetURLs.isEmpty, o.actionTargetURLs.isEmpty) {
+        case (true, true):   return nil
+        case (false, true):  return active
+        case (true, false):  return other
+        case (false, false): break
+        }
+        if a.markedURLs.isEmpty != o.markedURLs.isEmpty {
+            return a.markedURLs.isEmpty ? other : active
+        }
+        let aOnFile = a.node(for: a.cursorURL).map { !$0.isDirectory } ?? false
+        let oOnFile = o.node(for: o.cursorURL).map { !$0.isDirectory } ?? false
+        if aOnFile != oOnFile {
+            return aOnFile ? active : other
+        }
+        return other
+    }
+
+    /// source 트리의 항목을 반대편 트리에서 고른 폴더로 보내는 요청. 보낼 것이나 받을 곳이 없으면 nil.
+    private func makeTransfer(from source: Int, isMove: Bool) -> TransferRequest? {
+        let sources = panes[source].actionTargetURLs
+        guard !sources.isEmpty,
+              let destination = panes[1 - source].transferTargetDirectory else { return nil }
+        return TransferRequest(sourcePaneIndex: source, sources: sources, isMove: isMove,
+                               destinationPath: destination.path)
+    }
+
+    /// 듀얼 모드의 F5·F6: 방향을 정해 확인 창을 띄운다.
+    private func requestTransfer(isMove: Bool) {
+        guard let source = transferSourcePaneIndex() else { return }
+        pendingTransfer = makeTransfer(from: source, isMove: isMove)
+    }
+
+    /// 확인 창에서 누른 복사·이동을 실행한다.
+    ///
+    /// 이름이 겹치면 드래그앤드롭과 같은 규칙을 따른다 — 복사는 "사본"을 붙이고, 이동은 건너뛰며
+    /// 알린다. 원작처럼 덮어쓸지 묻지 않는 이유는 실수로 파일을 잃지 않게 하려는 것이다.
+    func confirmTransfer(destinationPath: String) {
+        guard let request = pendingTransfer else { return }
+        pendingTransfer = nil
+
+        if let problem = transferProblem(request, destinationPath: destinationPath) {
+            showErrorAfterSheetCloses(problem)
+            return
+        }
+        let destination = transferDestinationURL(destinationPath)
+
+        renameError = nil
+        for source in request.sources {
+            _ = dropItem(source, into: destination, copy: !request.isMove)
+        }
+        // 보낸 쪽 트리의 다중 선택을 푼다(활성 트리가 받는 쪽일 수도 있다).
+        panes[request.sourcePaneIndex].markedURLs = []
+        // dropItem이 남긴 오류(이름 충돌 등)도 확인 창이 닫힌 뒤에 보여 준다.
+        if let error = renameError {
+            renameError = nil
+            showErrorAfterSheetCloses(error)
+        }
+    }
+
+    /// 시트가 닫히는 중에 알림을 띄우면 macOS에서 알림이 무시될 수 있어 한 박자 늦춘다.
+    private func showErrorAfterSheetCloses(_ message: String) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            self?.renameError = message
+        }
+    }
+
+    func cancelTransfer() { pendingTransfer = nil }
+
+    /// 확인 창에 입력된 경로를 대상 폴더 URL로 바꾼다.
+    private func transferDestinationURL(_ path: String) -> URL {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        // standardizedFileURL은 쓰지 않는다. /private/tmp 같은 경로에서 "/private"를 떼어 내
+        // 트리가 가진 URL과 문자열이 달라지고, 그러면 반대편 트리가 바로 갱신되지 않는다.
+        return URL(fileURLWithPath: (trimmed as NSString).expandingTildeInPath)
+    }
+
+    /// 이대로 실행하면 안 되는 이유. 문제가 없으면 nil.
+    ///
+    /// 확인 창이 입력하는 동안 바로 보여 주고 실행 버튼을 막는 데 쓴다. 전에는 폴더를 자기 하위로
+    /// 복사하려 하면 아무 말 없이 무시돼 "복사가 안 된다"로만 보였다.
+    func transferProblem(_ request: TransferRequest, destinationPath: String) -> String? {
+        let destination = transferDestinationURL(destinationPath)
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: destination.path, isDirectory: &isDir),
+              isDir.boolValue else {
+            return L(.transferTargetMissing(destination.path))
+        }
+        let destPath = destination.path
+        for source in request.sources {
+            if destPath == source.path || destPath.hasPrefix(source.path + "/") {
+                return L(.transferIntoItself(source.lastPathComponent))
+            }
+            if request.isMove, source.deletingLastPathComponent().path == destPath {
+                return L(.transferSameFolder(source.lastPathComponent))
+            }
+        }
+        return nil
+    }
+
+    /// 확인 창에서 방향을 뒤집는다. 자동으로 정한 방향이 뜻과 다를 때 쓴다.
+    /// 창이 닫혔다 다시 뜨지 않도록 요청 id는 그대로 두고 내용만 바꾼다.
+    func reverseTransfer() {
+        guard let request = pendingTransfer, isDualPane,
+              let reversed = makeTransfer(from: 1 - request.sourcePaneIndex, isMove: request.isMove) else { return }
+        pendingTransfer?.sourcePaneIndex = reversed.sourcePaneIndex
+        pendingTransfer?.sources = reversed.sources
+        pendingTransfer?.destinationPath = reversed.destinationPath
+    }
+
+    /// 방향을 뒤집어 보낼 항목과 받을 폴더가 있는지(확인 창의 방향 바꾸기 버튼).
+    var canReverseTransfer: Bool {
+        guard let request = pendingTransfer, isDualPane else { return false }
+        return makeTransfer(from: 1 - request.sourcePaneIndex, isMove: request.isMove) != nil
+    }
+
+    // MARK: - 듀얼 모드 전환 / 좌우 바꾸기
+
+    /// 두 번째 트리를 열거나 닫는다(⇧⌘D).
+    func toggleDualPane() {
+        isDualPane ? closeSecondPane() : openSecondPane()
+    }
+
+    /// 두 번째 트리를 연다. 처음 열면 기본 트리와 같은 폴더에서 시작하고, 커서를 그쪽으로 옮긴다.
+    func openSecondPane() {
+        guard !isDualPane, let primaryRoot = primaryPane.root else { return }
+        let second = panes[1]
+        if second.root == nil {
+            second.startAccessing(primaryRoot.url)
+            second.setRoot(primaryRoot.url)
+            saveRootBookmark(for: second)
+        }
+        isDualPane = true
+        activePaneIndex = 1
+        focus = .tree
+    }
+
+    /// 두 번째 트리를 닫는다. 그 트리의 폴더·펼침 상태는 다음에 열 때를 위해 남겨 둔다.
+    func closeSecondPane() {
+        guard isDualPane else { return }
+        if renamingURL != nil, activePaneIndex == 1 { renamingURL = nil }
+        isDualPane = false
+        activePaneIndex = 0
+        focus = .tree
+    }
+
+    /// 좌우 트리를 맞바꾼다(⌃U, Total Commander의 "디렉터리 교환").
+    /// 활성 쪽(왼쪽/오른쪽)은 그대로 두고 내용만 바뀐다.
+    func swapPanes() {
+        guard isDualPane, renamingURL == nil else { return }
+        panes.swapAt(0, 1)
+        saveRootBookmark(for: panes[0])
+        saveRootBookmark(for: panes[1])
+    }
+
+    /// 한 트리의 커서 위치를 다른 트리에서도 연다(⌥⌘→: 왼쪽 → 오른쪽, ⌥⌘←: 오른쪽 → 왼쪽).
+    ///
+    /// Total Commander의 Ctrl+←/→(커서 위치를 왼쪽·오른쪽 창에 열기)에 해당한다. macOS는 ⌃←/→를
+    /// 데스크톱(Spaces) 전환에 쓰므로 ⌥⌘를 쓴다. 활성 트리와 상관없이 화살표 방향으로 위치를 보낸다.
+    ///
+    /// 여는 위치는 폴더다. 커서가 폴더면 그 폴더, 파일이면 그 파일이 든 폴더를 받는 트리에서 펼치고
+    /// 커서를 둔다. 그대로 F5·F6의 받을 폴더가 된다. 받는 트리의 루트 밖이면 보내는 트리의 루트로 바꾼다.
+    /// 오른쪽 트리가 닫혀 있으면 열고, 활성 트리는 바꾸지 않는다.
+    func showSameLocation(inPane targetIndex: Int) {
+        guard renamingURL == nil, targetIndex == 0 || targetIndex == 1 else { return }
+        if !isDualPane {
+            guard targetIndex == 1 else { return }
+            openSecondPane()
+            guard isDualPane else { return }
+            // 여는 김에 활성이 두 번째 트리로 넘어가지만, 작업하던 왼쪽 트리에 그대로 둔다.
+            activePaneIndex = 0
+        }
+
+        let source = panes[1 - targetIndex], target = panes[targetIndex]
+        guard let sourceRoot = source.root else { return }
+        let folder: URL
+        if let cursor = source.node(for: source.cursorURL) {
+            folder = cursor.isDirectory ? cursor.url : cursor.url.deletingLastPathComponent()
+        } else {
+            folder = sourceRoot.url
+        }
+
+        if !target.contains(folder) {
+            target.startAccessing(sourceRoot.url)
+            target.setRoot(sourceRoot.url)
+            saveRootBookmark(for: target)
+        }
+        guard let targetRoot = target.root else { return }
+        target.markedURLs = []
+        if folder.path == targetRoot.url.path {
+            // 루트 자체면 펼칠 것이 없다. 보내는 쪽 커서 항목(루트 바로 아래 파일)을 가리킨다.
+            if let cursor = source.cursorURL, target.contains(cursor) { target.reveal(cursor) }
+            return
+        }
+        target.expandPath(to: folder)
+        guard let node = target.loadedDirectory(atPath: folder.path) else { return }
+        node.loadChildrenIfNeeded()
+        target.expandedURLs.insert(node.url)
+        target.cursorURL = node.url
+    }
+
+    /// 트리를 활성으로 만든다(클릭·Tab). 포커스도 트리로 옮긴다.
+    func activatePane(_ pane: TreePane) {
+        guard isDualPane, let index = panes.firstIndex(where: { $0 === pane }) else {
+            focus = .tree
+            return
+        }
+        if activePaneIndex != index { activePaneIndex = index }
+        focus = .tree
+    }
+
+    /// 이 트리가 지금 키 입력을 받는 트리인지(헤더 강조·커서 표시용).
+    func isActivePane(_ pane: TreePane) -> Bool {
+        focus == .tree && activePane === pane
     }
 
     // MARK: - 트리 펼침
@@ -1242,26 +1538,11 @@ final class WorkspaceStore: ObservableObject {
 
     // MARK: - 펼쳐진 항목의 평면 목록 (키보드 탐색용)
 
-    /// 현재 펼침 상태 기준으로 화면에 보이는 노드들을 위→아래 순서로 평탄화.
-    var visibleNodes: [FileNode] {
-        guard let root else { return [] }
-        var result: [FileNode] = []
-        func walk(_ nodes: [FileNode]) {
-            for node in nodes {
-                result.append(node)
-                if node.isDirectory, expandedURLs.contains(node.url),
-                   let children = node.children {
-                    walk(children)
-                }
-            }
-        }
-        walk(root.children ?? [])
-        return result
-    }
+    /// 활성 트리에서 화면에 보이는 노드들(위→아래).
+    var visibleNodes: [FileNode] { activePane.visibleNodes }
 
     private func node(for url: URL?) -> FileNode? {
-        guard let url, let root else { return nil }
-        return root.findNode(url: url)
+        activePane.node(for: url)
     }
 
     // MARK: - 키보드 탐색 (트리)
@@ -1303,7 +1584,7 @@ final class WorkspaceStore: ObservableObject {
         guard let node = node(for: cursorURL) else { return }
         if node.isDirectory, expandedURLs.contains(node.url) {
             collapse(node)
-        } else if let parent = parentNode(of: node) {
+        } else if let parent = activePane.parentNode(of: node) {
             cursorURL = parent.url
         }
     }
@@ -1318,20 +1599,17 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
-    /// 루트 children 중 cursor 노드의 부모를 찾는다.
-    private func parentNode(of target: FileNode) -> FileNode? {
-        guard let root else { return nil }
-        let parentURL = target.url.deletingLastPathComponent()
-        if parentURL == root.url { return nil }   // 루트 직계면 부모 없음
-        return root.findNode(url: parentURL)
-    }
-
     // MARK: - 포커스 / Tab 순환
 
-    /// Tab: 트리 → 패널0 → 패널1 → … → 트리 순으로 포커스 이동.
+    /// Tab: 트리 → (두 번째 트리) → 패널0 → 패널1 → … → 트리 순으로 포커스 이동.
+    /// 듀얼 모드에서 좌우 트리를 Tab으로 오가는 것은 Total Commander와 같다.
     func focusNext() {
         switch focus {
         case .tree:
+            if isDualPane && activePaneIndex == 0 {
+                activePaneIndex = 1
+                return
+            }
             focus = .panel(0)
             activePanelIndex = 0
         case .panel(let i):
@@ -1339,6 +1617,7 @@ final class WorkspaceStore: ObservableObject {
                 focus = .panel(i + 1)
                 activePanelIndex = i + 1
             } else {
+                if isDualPane { activePaneIndex = 0 }
                 focus = .tree
             }
         }
@@ -1348,6 +1627,10 @@ final class WorkspaceStore: ObservableObject {
     func focusPrevious() {
         switch focus {
         case .tree:
+            if isDualPane && activePaneIndex == 1 {
+                activePaneIndex = 0
+                return
+            }
             let last = panels.count - 1
             focus = .panel(last)
             activePanelIndex = last
@@ -1356,6 +1639,7 @@ final class WorkspaceStore: ObservableObject {
                 focus = .panel(i - 1)
                 activePanelIndex = i - 1
             } else {
+                if isDualPane { activePaneIndex = 1 }
                 focus = .tree
             }
         }
@@ -1367,16 +1651,29 @@ final class WorkspaceStore: ObservableObject {
         activePanelIndex = index
         focus = .panel(index)
         if let url = panels[index].fileURL {
-            revealInTree(url)
+            sourcePane(ofPanel: index).reveal(url)
         }
     }
 
-    /// 트리에서 주어진 파일 위치를 드러낸다: 경로상의 폴더를 펼치고 커서를 그 파일로.
-    func revealInTree(_ url: URL) {
-        guard let root else { return }
-        guard url.path.hasPrefix(root.url.path) else { return }
-        expandPath(to: url, from: root)
-        cursorURL = url
+    /// 활성 뷰어 패널에 열린 파일을 이 트리에서 강조할지.
+    ///
+    /// 강조는 파일을 연 트리에만 둔다. 두 트리가 같은 폴더를 보고 있을 때 한쪽에서 파일을 고르면
+    /// 반대편 트리까지 같은 행이 칠해져 "양쪽이 함께 바뀌는" 것처럼 보이기 때문이다.
+    func highlightsOpenFile(in pane: TreePane) -> Bool {
+        sourcePane(ofPanel: activePanelIndex) === pane
+    }
+
+    /// 뷰어 패널의 파일을 연 트리. 트리가 하나이거나 기록이 없으면 활성 트리.
+    private func sourcePane(ofPanel index: Int) -> TreePane {
+        guard isDualPane, let id = panels[safe: index]?.sourcePaneID,
+              let pane = panes.first(where: { $0.id == id }) else { return activePane }
+        return pane
+    }
+
+    /// url을 보여 줄 트리. 활성 트리를 먼저 보고, 아니면 열려 있는 반대편 트리, 둘 다 밖이면 활성 트리.
+    private func treePane(containing url: URL) -> TreePane {
+        let visible = isDualPane ? panes : [primaryPane]
+        return ([activePane] + visible).first { $0.contains(url) } ?? activePane
     }
 
     // MARK: - 새 파일 / 폴더 생성
@@ -1420,11 +1717,12 @@ final class WorkspaceStore: ObservableObject {
             return
         }
 
-        // 대상 폴더를 펼치고 재스캔.
-        if let dir = (dirURL == root?.url ? root : root?.findNode(url: dirURL)) {
-            dir.children = FileNode.scan(directory: dirURL)
+        // 대상 폴더를 펼치고 재스캔(같은 폴더를 보고 있는 반대편 트리도 함께).
+        if let dir = activePane.loadedDirectory(atPath: dirURL.path) {
+            dir.children = FileNode.scan(directory: dir.url)
+            if dir !== root { expandedURLs.insert(dir.url) }
         }
-        expandedURLs.insert(dirURL)
+        otherPane?.rescanDirectory(dirURL)
         objectWillChange.send()
 
         // 새 항목으로 커서 이동 + 인라인 편집 시작.
@@ -1484,16 +1782,15 @@ final class WorkspaceStore: ObservableObject {
         }
         guard !deleted.isEmpty else { return }
 
-        // 영향받은 부모 폴더들을 재스캔(중복 제거).
+        // 영향받은 부모 폴더들을 재스캔(중복 제거, 두 트리 모두).
         let parents = Set(deleted.map { $0.deletingLastPathComponent() })
-        for dir in parents { rescanDirectory(dir) }
+        for dir in parents { rescanDirectoryInAllPanes(dir) }
 
-        // 관련 상태 정리: 펼침/커서/열린 패널에서 삭제된 경로(및 하위) 제거.
+        // 관련 상태 정리: 펼침/커서/선택/열린 패널에서 삭제된 경로(및 하위) 제거.
         func affected(_ u: URL) -> Bool {
             deleted.contains { u == $0 || u.path.hasPrefix($0.path + "/") }
         }
-        expandedURLs = expandedURLs.filter { !affected($0) }
-        if let c = cursorURL, affected(c) { cursorURL = nil }
+        panes.forEach { $0.forget(deleted: deleted) }
         for i in panels.indices {
             if let f = panels[i].fileURL, affected(f) {
                 panels[i].fileURL = nil
@@ -1558,62 +1855,17 @@ final class WorkspaceStore: ObservableObject {
             return
         }
 
-        // 부모 폴더를 재스캔해 새 URL의 노드로 교체.
-        let wasExpanded = expandedURLs.contains(node.url)
-        let wasCursor = cursorURL == node.url
-        rescanParent(of: node)
-
-        // 펼침/커서/열린 패널의 URL을 새 경로로 이전.
-        if wasExpanded {
-            expandedURLs.remove(node.url)
-            expandedURLs.insert(destination)
-        }
-        if wasCursor { cursorURL = destination }
-        for i in panels.indices where panels[i].fileURL == node.url {
-            panels[i].fileURL = destination
-        }
+        // 부모 폴더를 재스캔해 새 URL의 노드로 교체하고, 두 트리의 펼침/커서/선택과
+        // 열린 패널의 URL을 새 경로로 이전한다. 활성 트리만 고치면 이름 편집 중 다른 트리를
+        // 눌러(편집이 확정되면서 활성 트리가 바뀐 경우) 엉뚱한 트리의 상태를 옮기게 된다.
+        rescanDirectoryInAllPanes(node.url.deletingLastPathComponent())
+        migratePaths(from: node.url, to: destination)
         persistOpenedFiles()
     }
 
-    /// 주어진 노드의 부모 폴더 children을 다시 스캔한다(루트 직계면 루트 재스캔).
-    private func rescanParent(of node: FileNode) {
-        rescanDirectory(node.url.deletingLastPathComponent())
-    }
-
-    /// 루트와 현재 로드된 모든 폴더를 재스캔한다(필터 변경 등 전역 갱신용).
-    ///
-    /// scan()이 만드는 새 자식 노드는 children == nil(미로드)이므로, 재귀 시
-    /// "원래 로드돼 있었는지"를 부모에서 판단해 넘긴다. 그래야 펼쳐져 있던
-    /// 하위 폴더가 재스캔 뒤에도 children을 다시 채워 펼침 상태를 유지한다.
-    private func rescanAll() {
-        guard let root else { return }
-        // node의 children이 이미 로드돼 있었을 때만 재스캔한다.
-        // 재스캔으로 교체된 새 자식들은, 펼쳐져 있던(expandedURLs) 것만 다시 로드해
-        // 하위로 재귀한다.
-        func walk(_ node: FileNode, wasLoaded: Bool) {
-            guard node.isDirectory, wasLoaded else { return }
-            node.children = FileNode.scan(directory: node.url)
-            for child in node.children ?? [] {
-                // 새 자식은 항상 미로드 상태이므로, 펼쳐져 있던 폴더만 이어서 로드한다.
-                walk(child, wasLoaded: expandedURLs.contains(child.url))
-            }
-        }
-        walk(root, wasLoaded: root.children != nil)
-        // 더 이상 보이지 않는 항목을 가리키는 커서/선택 정리.
-        let visible = Set(visibleNodes.map { $0.url })
-        if let c = cursorURL, !visible.contains(c) { cursorURL = nil }
-        markedURLs = markedURLs.filter { visible.contains($0) }
-        objectWillChange.send()
-    }
-
-    /// 주어진 디렉터리 URL의 children을 (트리에 로드돼 있다면) 다시 스캔한다.
-    private func rescanDirectory(_ dirURL: URL) {
-        guard let root else { return }
-        if dirURL == root.url {
-            root.children = FileNode.scan(directory: root.url)
-        } else if let dir = root.findNode(url: dirURL), dir.children != nil {
-            dir.children = FileNode.scan(directory: dirURL)
-        }
+    /// 주어진 디렉터리를, 그 폴더를 로드해 둔 모든 트리에서 다시 스캔한다.
+    private func rescanDirectoryInAllPanes(_ dirURL: URL) {
+        panes.forEach { $0.rescanDirectory(dirURL) }
     }
 
     // MARK: - 드래그앤드롭 이동/복사
@@ -1662,17 +1914,19 @@ final class WorkspaceStore: ObservableObject {
             return false
         }
 
-        // 목적지 폴더의 children을 무조건 (재)로드하고 펼쳐서 결과를 보여준다.
+        // 목적지 폴더를 보여 주는 트리마다 children을 무조건 (재)로드하고 펼쳐서 결과를 보여준다.
         // 이미 펼쳐진 폴더로 드롭하면 expandedURLs가 안 바뀌어 갱신이 누락되므로
         // objectWillChange로 트리 재계산을 명시적으로 트리거한다.
         objectWillChange.send()
-        if let destNode = (destDir == root?.url ? root : root?.findNode(url: destDir)) {
-            destNode.children = FileNode.scan(directory: destDir)
+        for pane in panes where pane.contains(destDir) {
+            guard let destNode = pane.loadedDirectory(atPath: destDir.path) else { continue }
+            destNode.children = FileNode.scan(directory: destNode.url)
+            // 펼침 상태는 트리 노드의 URL로 기록해야 행 표시와 맞는다.
+            if destNode !== pane.root { pane.expandedURLs.insert(destNode.url) }
         }
-        expandedURLs.insert(destDir)
 
         if !copy {
-            rescanDirectory(sourceParent)
+            rescanDirectoryInAllPanes(sourceParent)
             // 이동된 항목 관련 상태를 새 경로로 이전.
             migratePaths(from: sourceURL, to: destination)
         }
@@ -1697,21 +1951,17 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
-    /// 이동 시 펼침/커서/열린 패널의 URL 접두사를 old→new로 교체.
+    /// 이동 시 두 트리의 펼침/커서/선택과 열린 패널의 URL 접두사를 old→new로 교체.
     private func migratePaths(from old: URL, to new: URL) {
+        panes.forEach { $0.migratePaths(from: old, to: new) }
         let oldPrefix = old.path
-        func remap(_ url: URL) -> URL {
-            if url == old { return new }
-            if url.path.hasPrefix(oldPrefix + "/") {
-                let suffix = String(url.path.dropFirst(oldPrefix.count))
-                return URL(fileURLWithPath: new.path + suffix)
-            }
-            return url
-        }
-        expandedURLs = Set(expandedURLs.map(remap))
-        if let c = cursorURL { cursorURL = remap(c) }
         for i in panels.indices {
-            if let f = panels[i].fileURL { panels[i].fileURL = remap(f) }
+            guard let f = panels[i].fileURL else { continue }
+            if f == old {
+                panels[i].fileURL = new
+            } else if f.path.hasPrefix(oldPrefix + "/") {
+                panels[i].fileURL = URL(fileURLWithPath: new.path + String(f.path.dropFirst(oldPrefix.count)))
+            }
         }
     }
 
@@ -2019,6 +2269,9 @@ final class WorkspaceStore: ObservableObject {
         if defaults.object(forKey: Key.treeWidth) != nil {
             setTreeWidth(CGFloat(defaults.double(forKey: Key.treeWidth)))
         }
+        if defaults.object(forKey: Key.secondTreeWidth) != nil {
+            setSecondTreeWidth(CGFloat(defaults.double(forKey: Key.secondTreeWidth)))
+        }
         if defaults.object(forKey: Key.terminalWidth) != nil {
             // 창 크기는 아직 모르므로 상한은 넉넉히 두고, 실제 제한은 레이아웃이 건다.
             setTerminalWidth(CGFloat(defaults.double(forKey: Key.terminalWidth)), limit: .greatestFiniteMagnitude)
@@ -2061,42 +2314,69 @@ final class WorkspaceStore: ObservableObject {
             return
         }
 
-        guard url.startAccessingSecurityScopedResource() else {
+        let primary = primaryPane
+        guard primary.startAccessing(url) else {
             restoreFailure = RestoreFailure(path: url.path)
             return
         }
-        accessedRootURL = url
 
         // 북마크는 풀렸지만 폴더 자체가 사라진 경우(외장 디스크 분리 등).
         guard FileManager.default.fileExists(atPath: url.path) else {
-            stopAccessingRoot()
+            primary.stopAccessing()
             restoreFailure = RestoreFailure(path: url.path)
             return
         }
 
-        let node = FileNode(url: url, isDirectory: true)
-        node.loadChildrenIfNeeded()
-        root = node
+        primary.setRoot(url)
 
-        if isStale { saveRootBookmark(url) }  // 북마크 갱신
+        if isStale { saveRootBookmark(for: primary) }  // 북마크 갱신
 
-        restoreOpenedFiles(under: node)
+        // 두 번째 트리를 먼저 되살린다. 뷰어에 열려 있던 파일이 그쪽 폴더에 있을 수 있다.
+        restoreSecondPane()
+        restoreOpenedFiles()
     }
 
-    /// 저장된 패널별 파일들을 복원한다(각 패널에 해당 파일을 열고, 경로를 따라 트리 펼침).
-    private func restoreOpenedFiles(under root: FileNode) {
+    /// 지난 세션이 듀얼 모드였다면 두 번째 트리를 되살린다.
+    /// 두 번째 트리의 폴더를 못 열면(지워짐·권한 없음) 기본 트리와 같은 폴더로 연다.
+    private func restoreSecondPane() {
+        guard defaults.bool(forKey: Key.dualPane), let primaryRoot = primaryPane.root else { return }
+        let second = panes[1]
+
+        var restoredURL: URL?
+        if let data = defaults.data(forKey: Key.secondRootBookmark) {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: data, options: [.withSecurityScope],
+                                  relativeTo: nil, bookmarkDataIsStale: &isStale),
+               FileManager.default.fileExists(atPath: url.path),
+               second.startAccessing(url) {
+                restoredURL = url
+            }
+        }
+        if restoredURL == nil { second.startAccessing(primaryRoot.url) }
+        second.setRoot(restoredURL ?? primaryRoot.url)
+        saveRootBookmark(for: second)
+
+        isDualPane = true
+        activePaneIndex = min(max(defaults.integer(forKey: Key.activeTreePane), 0), 1)
+    }
+
+    /// 저장된 패널별 파일들을 복원한다(각 패널에 해당 파일을 열고, 그 파일이 든 트리를 펼침).
+    private func restoreOpenedFiles() {
         guard let paths = defaults.array(forKey: Key.openedFiles) as? [String],
               !paths.isEmpty else { return }
 
+        let visiblePanes = isDualPane ? panes : [primaryPane]
         var restored: [ViewerPanel] = []
         for path in paths {
             guard !path.isEmpty else { restored.append(ViewerPanel()); continue }
             let target = URL(fileURLWithPath: path)
-            guard target.path.hasPrefix(root.url.path) else {
+            // 파일이 든 트리를 고른다(활성 트리 우선). 어느 트리 밖이면 빈 패널로 둔다.
+            guard let pane = ([activePane] + visiblePanes).first(where: { $0.contains(target) }),
+                  let paneRoot = pane.root else {
                 restored.append(ViewerPanel()); continue
             }
-            expandPath(to: target, from: root)
-            if root.findNode(url: target) != nil {
+            pane.expandPath(to: target)
+            if paneRoot.findNode(url: target) != nil {
                 let ext = target.pathExtension.lowercased()
                 let isMd = FileNode.markdownExtensions.contains(ext)
                 let isPdf = FileNode.pdfExtensions.contains(ext)
@@ -2105,11 +2385,13 @@ final class WorkspaceStore: ObservableObject {
                 let isRich = FileNode.richDocExtensions.contains(ext)
                 let isBinary = isPdf || isImg || isRich
                 let text = isBinary ? nil : ((try? String(contentsOf: target, encoding: .utf8)) ?? L(.cannotReadFile))
-                restored.append(ViewerPanel(fileURL: target, content: text,
-                                            isPlainText: !isMd && !isBinary && !isHtml,
-                                            isPDF: isPdf, isImage: isImg,
-                                            isHTML: isHtml, isRichDoc: isRich,
-                                            richDocPDF: isRich ? DocumentConverter.cachedPDF(for: target) : nil))
+                var panel = ViewerPanel(fileURL: target, content: text,
+                                        isPlainText: !isMd && !isBinary && !isHtml,
+                                        isPDF: isPdf, isImage: isImg,
+                                        isHTML: isHtml, isRichDoc: isRich,
+                                        richDocPDF: isRich ? DocumentConverter.cachedPDF(for: target) : nil)
+                panel.sourcePaneID = pane.id
+                restored.append(panel)
             } else {
                 restored.append(ViewerPanel())
             }
@@ -2127,31 +2409,12 @@ final class WorkspaceStore: ObservableObject {
                 panelWeights = Array(repeating: 1, count: panels.count)
             }
             normalizeWeights()
-            // 커서를 활성 패널의 파일에 맞춘다.
-            cursorURL = panels[activePanelIndex].fileURL ?? root.children?.first?.url
+            // 커서를 활성 패널의 파일에 맞춘다(그 파일이 활성 트리 안에 있을 때).
+            if let file = panels[activePanelIndex].fileURL, activePane.contains(file) {
+                cursorURL = file
+            }
             // 복원된 서식 문서 중 아직 변환본이 없는 것은 뒤에서 변환해 둔다.
             for index in panels.indices { startConversionIfNeeded(panel: index) }
-        }
-    }
-
-    /// target에 이르는 중간 폴더들의 children을 로드하고, target의 부모까지의
-    /// 모든 폴더를 펼침 상태로 기록한다.
-    private func expandPath(to target: URL, from root: FileNode) {
-        var current = root
-        let rootComponents = root.url.pathComponents
-        let targetComponents = target.pathComponents
-        guard targetComponents.count > rootComponents.count else { return }
-
-        let pathComps = Array(targetComponents[rootComponents.count...])
-        for (offset, component) in pathComps.enumerated() {
-            current.loadChildrenIfNeeded()
-            guard let next = current.children?.first(where: { $0.name == component }) else { return }
-            // target의 부모까지(즉 마지막 직전 컴포넌트까지)인 폴더만 펼친다.
-            let isParentLevel = offset < pathComps.count - 1
-            if isParentLevel, next.isDirectory {
-                expandedURLs.insert(next.url)
-            }
-            current = next
         }
     }
 
@@ -2169,40 +2432,28 @@ final class WorkspaceStore: ObservableObject {
         defaults.set(panelWeights.map { Double($0) }, forKey: Key.panelWeights)
     }
 
-    private func saveRootBookmark(_ url: URL) {
-        if let data = try? url.bookmarkData(
-            options: [.withSecurityScope],
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        ) {
-            defaults.set(data, forKey: Key.rootBookmark)
-        }
-    }
-
-    private func stopAccessingRoot() {
-        accessedRootURL?.stopAccessingSecurityScopedResource()
-        accessedRootURL = nil
+    /// 트리의 루트 폴더를 북마크로 저장한다. 왼쪽(0번) 자리와 오른쪽(1번) 자리를 따로 기억한다.
+    private func saveRootBookmark(for pane: TreePane) {
+        guard let url = pane.root?.url,
+              let index = panes.firstIndex(where: { $0 === pane }),
+              let data = try? url.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil)
+        else { return }
+        defaults.set(data, forKey: index == 0 ? Key.rootBookmark : Key.secondRootBookmark)
     }
 
     // MARK: - 외부 변경 감시 (FSEvents)
 
-    /// 현재 루트에 대한 파일시스템 감시를 (재)시작한다. root의 didSet에서 호출.
-    private func startWatchingRoot() {
-        directoryWatcher = nil
-        guard let rootURL = root?.url else { return }
-        directoryWatcher = DirectoryWatcher(url: rootURL) { [weak self] in
-            self?.handleExternalChange()
-        }
-    }
-
-    /// 외부에서 파일시스템이 바뀌었을 때 호출(FSEvents 콜백, 메인 큐).
-    /// 로드된 모든 폴더를 다시 스캔해 트리를 실제 디스크 상태와 맞추고,
+    /// 트리 루트 하위에서 외부 변경이 감지됐을 때 호출(FSEvents 콜백, 메인 큐).
+    /// 그 트리의 로드된 폴더를 다시 스캔해 실제 디스크 상태와 맞추고,
     /// 열린 뷰어 패널의 파일 내용도 디스크에서 다시 읽어 반영한다.
-    private func handleExternalChange() {
+    private func handleExternalChange(in pane: TreePane) {
         // 인라인 이름 편집 중에는 재스캔이 편집 대상 노드를 교체해 버릴 수 있어
         // 건너뛴다. 편집이 끝나면 다음 이벤트에서 반영된다.
         guard renamingURL == nil else { return }
-        rescanAll()
+        pane.rescanAll()
         reloadOpenPanelsFromDisk()
         // 파일 인덱스는 여기서 다시 훑지 않고 낡았다고만 표시한다. 파일 하나 저장할 때마다
         // 수만 개를 다시 훑을 이유가 없다. 검색 창을 열 때 필요하면 그때 갱신한다.
@@ -2231,9 +2482,6 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
-    deinit {
-        accessedRootURL?.stopAccessingSecurityScopedResource()
-    }
 }
 
 extension Array {

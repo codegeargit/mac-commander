@@ -148,6 +148,26 @@ enum L10n {
     case fkeyRename    // F6
     case fkeyNewFolder // F7
     case fkeyDelete    // F8
+    case fkeyMove      // 듀얼 모드 F6(하단 F키 바의 짧은 이름)
+    case menuSameLocationRight  // ⌥⌘→ 왼쪽 트리 커서 위치를 오른쪽 트리에서 열기
+    case menuSameLocationLeft   // ⌥⌘← 오른쪽 트리 커서 위치를 왼쪽 트리에서 열기
+    case fkeyCopyToOther  // 듀얼 모드 F5: 반대편 트리로 복사
+    case fkeyMoveToOther  // 듀얼 모드 F6: 반대편 트리로 이동
+
+    // 듀얼 모드(두 번째 트리)
+    case menuOpenSecondTree   // 보기 메뉴: 두 번째 트리 열기
+    case menuCloseSecondTree  // 보기 메뉴: 두 번째 트리 닫기
+    case menuSwapTrees        // 보기 메뉴: 좌우 트리 바꾸기(⌃U)
+    case transferCopyTitle    // 복사 확인 창 제목·확인 버튼
+    case transferMoveTitle    // 이동 확인 창 제목·확인 버튼
+    case transferCopyPrompt(Int)
+    case transferMovePrompt(Int)
+    case transferTargetMissing(String)
+    case transferIntoItself(String)   // 폴더를 자기 자신·하위로 복사·이동
+    case transferSameFolder(String)   // 이미 그 폴더에 있는 항목을 이동
+    case transferReverse              // 확인 창: 방향 바꾸기 버튼
+    case transferDirection(Bool)      // 확인 창: 보내는 방향(true = 왼쪽 → 오른쪽)
+    case transferTo                   // 확인 창: 대상 폴더 라벨
 
     // 파일 필터(트리 헤더 토글)
     case filterMarkdownOnly  // 토글 OFF 상태 툴팁: 현재 md만 보는 중
@@ -281,6 +301,9 @@ enum L10n {
     case scGoParent
     case scGoToFolder
     case scMultiRename
+    case scToggleSecondTree  // 두 번째 트리 열기/닫기
+    case scF5                // F5 설명(트리 하나 / 듀얼 모드)
+    case scF6                // F6 설명(트리 하나 / 듀얼 모드)
     case scMouseOpen         // 클릭: 열기
     case scMouseNewPanel     // Cmd+클릭: 새 패널
     case scMouseToggle       // Option+클릭: 선택 토글
@@ -443,6 +466,37 @@ enum L10n {
         case .fkeyRename:    ko = "이름변경"; en = "Rename"
         case .fkeyNewFolder: ko = "새폴더"; en = "NewFolder"
         case .fkeyDelete:    ko = "삭제"; en = "Delete"
+        case .fkeyMove:      ko = "이동"; en = "Move"
+        case .fkeyCopyToOther: ko = "반대편으로 복사"; en = "Copy to Other Tree"
+        case .fkeyMoveToOther: ko = "반대편으로 이동"; en = "Move to Other Tree"
+
+        case .menuOpenSecondTree:  ko = "두 번째 트리 열기"; en = "Show Second Tree"
+        case .menuCloseSecondTree: ko = "두 번째 트리 닫기"; en = "Hide Second Tree"
+        case .menuSwapTrees:       ko = "좌우 트리 바꾸기"; en = "Swap Trees"
+        case .menuSameLocationRight: ko = "오른쪽 트리에 같은 위치 열기"; en = "Show Same Folder in Right Tree"
+        case .menuSameLocationLeft:  ko = "왼쪽 트리에 같은 위치 열기"; en = "Show Same Folder in Left Tree"
+        case .transferCopyTitle:   ko = "복사"; en = "Copy"
+        case .transferMoveTitle:   ko = "이동"; en = "Move"
+        case .transferCopyPrompt(let n):
+            ko = "\(n)개 항목을 다음 폴더로 복사합니다."
+            en = n == 1 ? "Copy 1 item to this folder:" : "Copy \(n) items to this folder:"
+        case .transferMovePrompt(let n):
+            ko = "\(n)개 항목을 다음 폴더로 이동합니다."
+            en = n == 1 ? "Move 1 item to this folder:" : "Move \(n) items to this folder:"
+        case .transferTargetMissing(let path):
+            ko = "대상 폴더가 없습니다: \(path)"
+            en = "Target folder not found: \(path)"
+        case .transferIntoItself(let name):
+            ko = "'\(name)' 폴더를 자기 자신이나 그 안의 폴더로 보낼 수 없습니다."
+            en = "Can't put \"\(name)\" inside itself."
+        case .transferSameFolder(let name):
+            ko = "'\(name)'은(는) 이미 대상 폴더에 있습니다."
+            en = "\"\(name)\" is already in the target folder."
+        case .transferReverse: ko = "방향 바꾸기"; en = "Reverse"
+        case .transferDirection(let leftToRight):
+            ko = leftToRight ? "왼쪽 트리 → 오른쪽 트리" : "오른쪽 트리 → 왼쪽 트리"
+            en = leftToRight ? "Left tree → Right tree" : "Right tree → Left tree"
+        case .transferTo:      ko = "대상 폴더"; en = "Target folder"
 
         case .filterMarkdownOnly: ko = "마크다운만 보기 (클릭: 전체 파일)"; en = "Markdown only (click for all files)"
         case .filterAllFiles:     ko = "전체 파일 보기 (클릭: 마크다운만)"; en = "All files (click for Markdown only)"
@@ -580,8 +634,15 @@ enum L10n {
         case .scToggleTerminal: ko = "터미널 패널 열기/닫기"; en = "Toggle Terminal Panel"
         case .scAddPanel:       ko = "뷰어 패널 늘리기"; en = "Add Viewer Panel"
         case .scRemovePanel:    ko = "뷰어 패널 줄이기"; en = "Remove Viewer Panel"
-        case .scFocusNext:      ko = "다음 영역으로 포커스"; en = "Focus Next Area"
+        case .scFocusNext:      ko = "다음 영역으로 포커스 (듀얼 모드: 좌우 트리 전환)"; en = "Focus Next Area (dual mode: switch trees)"
         case .scFocusPrev:      ko = "이전 영역으로 포커스"; en = "Focus Previous Area"
+        case .scToggleSecondTree: ko = "두 번째 트리 열기/닫기"; en = "Show/Hide Second Tree"
+        case .scF5:
+            ko = "복사 (듀얼 모드: 한쪽에서 고른 항목을 반대편에서 고른 폴더로)"
+            en = "Copy (dual mode: selected items to the folder selected in the other tree)"
+        case .scF6:
+            ko = "이름변경 (듀얼 모드: 한쪽에서 고른 항목을 반대편에서 고른 폴더로 이동)"
+            en = "Rename (dual mode: move selected items to the folder selected in the other tree)"
         case .scGoParent:       ko = "상위 폴더로"; en = "Go to Parent Folder"
         case .scGoToFolder:     ko = "폴더로 이동"; en = "Go to Folder"
         case .scMultiRename:    ko = "멀티 리네임"; en = "Multi-Rename"

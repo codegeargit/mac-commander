@@ -19,15 +19,23 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // 열어둔 폴더가 없으면 창 전체를 시작 화면으로 쓴다. 트리 폭(좁은 칼럼)에
             // 안내를 밀어 넣으면 첫 실행에 무엇을 해야 하는지가 잘 읽히지 않는다.
-            if let root = store.root {
+            if let root = store.primaryPane.root {
                 HStack(spacing: 0) {
-                    FileTreeView(root: root, rootPath: root.url.path)
+                    FileTreeView(pane: store.primaryPane, root: root)
                         .frame(width: store.treeWidth)
 
                     // zIndex: 구분선의 히트 영역이 이웃 뷰(뷰어·터미널)에 덮이지 않게
                     // 형제 위로 올린다. 덮이면 그쪽 절반에서 커서가 바뀌지 않는다.
                     resizeDivider
                         .zIndex(1)
+
+                    // 두 번째 트리(듀얼 모드). 필요할 때만 열고, 뷰어는 그 오른쪽에 그대로 둔다.
+                    if store.isDualPane, let secondRoot = store.panes[1].root {
+                        FileTreeView(pane: store.panes[1], root: secondRoot)
+                            .frame(width: store.secondTreeWidth)
+                        secondTreeDivider
+                            .zIndex(1)
+                    }
 
                     // 뷰어 패널들 + 터미널(오른쪽 또는 아래)
                     viewerArea
@@ -37,6 +45,12 @@ struct ContentView: View {
 
                 // 하단 상태바 — 커서 항목 정보 / 선택 요약 / 폴더 항목 수
                 StatusBarView()
+
+                // 트리가 둘일 때는 원작처럼 맨 아래에 F키 바를 둔다.
+                // 반대편으로 복사·이동이 핵심 조작이 되므로 키를 눈앞에 보여 준다.
+                if store.isDualPane {
+                    FunctionKeyBar()
+                }
             } else {
                 WelcomeView()
                     .frame(maxHeight: .infinity)
@@ -44,6 +58,38 @@ struct ContentView: View {
         }
         .frame(minWidth: 700, minHeight: 440)
         .background(Palette.viewerBackground)
+        // 이름 변경·파일 작업 오류. 트리가 둘이어도 한 번만 뜨도록 여기서 띄운다.
+        .alert(loc.string(.renameTitle),
+               isPresented: Binding(
+                get: { store.renameError != nil },
+                set: { if !$0 { store.renameError = nil } }
+               )) {
+            Button(loc.string(.ok), role: .cancel) { store.renameError = nil }
+        } message: {
+            Text(store.renameError ?? "")
+        }
+        // 삭제 확인.
+        .alert(loc.string(.deleteTitle),
+               isPresented: Binding(
+                get: { !store.pendingDeleteURLs.isEmpty },
+                set: { if !$0 { store.cancelDelete() } }
+               )) {
+            Button(loc.string(.cancel), role: .cancel) { store.cancelDelete() }
+            Button(loc.string(.moveToTrash), role: .destructive) { store.confirmDelete() }
+        } message: {
+            // 단일이면 파일명, 다중이면 "N개 항목을 휴지통으로?".
+            if store.pendingDeleteCount == 1 {
+                Text(loc.string(.confirmDelete(store.pendingDeleteName)))
+            } else {
+                Text(loc.string(.confirmDeleteMulti(store.pendingDeleteCount)))
+            }
+        }
+        // 반대편 트리로 복사·이동 확인(듀얼 모드 F5·F6).
+        .sheet(item: $store.pendingTransfer) { request in
+            TransferView(request: request)
+                .environmentObject(store)
+                .environmentObject(loc)
+        }
         // 멀티 리네임 시트 (Total Commander MRT)
         .sheet(isPresented: $store.showMultiRename) {
             MultiRenameView()
@@ -201,10 +247,17 @@ struct ContentView: View {
         }
     }
 
-    /// 트리와 뷰어 사이의 드래그 가능한 구분선.
+    /// 기본 트리 오른쪽의 드래그 가능한 구분선.
     private var resizeDivider: some View {
         ResizeDivider { delta in
             store.setTreeWidth(store.treeWidth + delta)
+        }
+    }
+
+    /// 두 번째 트리와 뷰어 사이의 드래그 가능한 구분선.
+    private var secondTreeDivider: some View {
+        ResizeDivider { delta in
+            store.setSecondTreeWidth(store.secondTreeWidth + delta)
         }
     }
 

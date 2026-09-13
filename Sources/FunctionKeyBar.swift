@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// 화면 하단의 Function Key 바 — Total Commander의 시그니처 UI.
-/// F3~F8을 레트로 키캡 스타일 버튼으로 보여주고, 클릭/단축키 양쪽으로 동작한다.
+/// 듀얼 모드(트리 2개)에서 상태바 아래에 붙어, 반대편 트리로 복사·이동 같은 파일 작업 키를
+/// 레트로 키캡 스타일 버튼으로 보여 준다. 클릭과 단축키 양쪽으로 동작한다.
 struct FunctionKeyBar: View {
     @EnvironmentObject private var store: WorkspaceStore
     @EnvironmentObject private var loc: LocalizationManager
@@ -9,27 +10,38 @@ struct FunctionKeyBar: View {
 
     /// 한 개의 F-key 정의.
     private struct FKey: Identifiable {
-        let id = UUID()
-        let n: Int
-        let label: L10n
+        var id: String { key }
+        let key: String
+        let title: String
+        /// 마우스를 올렸을 때 보여 줄 긴 설명(없으면 title).
+        var help: String? = nil
+        let enabled: Bool
         let action: () -> Void
-        let enabled: () -> Bool
     }
 
     private var keys: [FKey] {
-        [
-            FKey(n: 3, label: .fkeyView,      action: { store.fkeyView() },
-                 enabled: { store.cursorURL != nil || store.selectedURL != nil }),
-            FKey(n: 4, label: .fkeyEdit,      action: { store.fkeyEdit() },
-                 enabled: { store.cursorURL != nil || store.selectedURL != nil }),
-            FKey(n: 5, label: .fkeyCopy,      action: { store.fkeyCopyAtCursor() },
-                 enabled: { store.cursorURL != nil }),
-            FKey(n: 6, label: .fkeyRename,    action: { store.fkeyRenameAtCursor() },
-                 enabled: { store.cursorURL != nil }),
-            FKey(n: 7, label: .fkeyNewFolder, action: { store.createFolderAtCursor() },
-                 enabled: { store.root != nil }),
-            FKey(n: 8, label: .fkeyDelete,    action: { store.requestDeleteAtCursor() },
-                 enabled: { store.cursorURL != nil }),
+        let hasCursor = store.cursorURL != nil
+        let hasTargets = hasCursor || store.markedCount > 0
+        // 복사·이동이 향하는 쪽. 보낼 것이 없으면 화살표를 붙이지 않는다.
+        let source = store.transferSourcePaneIndex()
+        let arrow = source.map { $0 == 0 ? " →" : " ←" } ?? ""
+        return [
+            FKey(key: "F3", title: loc.string(.fkeyView),
+                 enabled: hasCursor || store.selectedURL != nil) { store.fkeyView() },
+            FKey(key: "F4", title: loc.string(.fkeyEdit),
+                 enabled: hasCursor || store.selectedURL != nil) { store.fkeyEdit() },
+            FKey(key: "F5", title: loc.string(.fkeyCopy) + arrow,
+                 help: loc.string(.fkeyCopyToOther),
+                 enabled: source != nil) { store.fkeyCopyAtCursor() },
+            FKey(key: "F6", title: loc.string(.fkeyMove) + arrow,
+                 help: loc.string(.fkeyMoveToOther),
+                 enabled: source != nil) { store.fkeyRenameAtCursor() },
+            FKey(key: "⇧F6", title: loc.string(.fkeyRename),
+                 enabled: hasCursor) { store.fkeyRenameInPlace() },
+            FKey(key: "F7", title: loc.string(.fkeyNewFolder),
+                 enabled: store.root != nil) { store.createFolderAtCursor() },
+            FKey(key: "F8", title: loc.string(.fkeyDelete),
+                 enabled: hasTargets) { store.requestDeleteAtCursor() },
         ]
     }
 
@@ -37,9 +49,10 @@ struct FunctionKeyBar: View {
         HStack(spacing: 6) {
             ForEach(keys) { key in
                 FunctionKeyButton(
-                    number: key.n,
-                    title: loc.string(key.label),
-                    enabled: key.enabled(),
+                    key: key.key,
+                    title: key.title,
+                    help: key.help ?? key.title,
+                    enabled: key.enabled,
                     action: key.action
                 )
             }
@@ -60,8 +73,9 @@ struct FunctionKeyBar: View {
 /// 레트로 키캡 스타일 버튼 하나. 좌측에 시안 키캡(F3), 우측에 라벨.
 private struct FunctionKeyButton: View {
     @EnvironmentObject private var theme: ThemeManager
-    let number: Int
+    let key: String
     let title: String
+    let help: String
     let enabled: Bool
     let action: () -> Void
 
@@ -72,7 +86,7 @@ private struct FunctionKeyButton: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 // 키캡: 움푹한 입체감(상단 하이라이트 + 하단 그림자)을 준 시안 캡.
-                Text("F\(number)")
+                Text(key)
                     .font(.system(size: 10.5, weight: .bold, design: .monospaced))
                     .foregroundStyle(Palette.selectForeground)
                     .padding(.horizontal, 5)
@@ -111,6 +125,8 @@ private struct FunctionKeyButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // 눌러도 키보드 포커스를 가져가지 않는다. 가져가면 트리의 화살표·Tab 조작이 끊긴다.
+        .focusable(false)
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.4)
         .onHover { hovering = $0 && enabled }
@@ -122,6 +138,6 @@ private struct FunctionKeyButton: View {
                 .onChanged { _ in if enabled { pressed = true } }
                 .onEnded { _ in pressed = false }
         )
-        .help("F\(number) · \(title)")
+        .help("\(key) · \(help)")
     }
 }

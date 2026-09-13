@@ -1,9 +1,13 @@
 import SwiftUI
 
-/// 좌측 파일 트리 패널 (레트로 Commander 스타일). 키보드 탐색 지원.
+/// 파일 트리 패널 (레트로 Commander 스타일). 키보드 탐색 지원.
+///
+/// 듀얼 모드에서는 트리 둘이 나란히 뜬다. 각 트리는 자기 `TreePane` 상태를 그리고,
+/// 클릭·키 입력이 들어오면 먼저 자기를 활성 트리로 만든 뒤 스토어 동작을 부른다
+/// (스토어의 트리 동작은 활성 트리를 대상으로 한다).
 struct FileTreeView: View {
+    @ObservedObject var pane: TreePane
     @ObservedObject var root: FileNode
-    let rootPath: String
     @EnvironmentObject private var store: WorkspaceStore
     @EnvironmentObject private var loc: LocalizationManager
     @EnvironmentObject private var theme: ThemeManager
@@ -13,7 +17,16 @@ struct FileTreeView: View {
     /// 다음 커서 변경에 자동 스크롤을 붙이지 않는다(마우스 클릭 직후).
     @State private var suppressCursorScroll = false
 
-    private var hasTreeFocus: Bool { store.focus == .tree }
+    /// 이 트리가 키 입력을 받는 중인지.
+    private var hasTreeFocus: Bool { store.isActivePane(pane) }
+    /// 이 트리가 두 번째(듀얼 모드용) 트리인지.
+    private var isSecondPane: Bool { store.panes.last === pane }
+
+    /// 이 트리를 활성으로 만든다. 모든 사용자 동작의 첫 단계.
+    private func activate() {
+        store.activatePane(pane)
+        isFocused = true
+    }
 
     /// 드롭 대상 노드가 실제로 받게 될 폴더 URL(폴더면 자신, 파일이면 부모).
     private func dropFolder(for node: FileNode) -> URL {
@@ -21,6 +34,7 @@ struct FileTreeView: View {
     }
 
     /// 드롭 처리: Option(⌥) 누른 상태면 복사, 아니면 이동.
+    /// 다른 트리에서 끌어온 항목도 URL로 오므로 두 트리 사이 끌어 놓기가 그대로 된다.
     private func handleDrop(_ items: [URL], onto node: FileNode) -> Bool {
         let destDir = dropFolder(for: node)
         let copy = NSEvent.modifierFlags.contains(.option)
@@ -35,20 +49,20 @@ struct FileTreeView: View {
         VStack(spacing: 0) {
             // 헤더 바 (상위 이동 버튼 + 현재 경로)
             HStack(spacing: 4) {
-                Button(action: { store.goToParentOrPrompt() }) {
+                Button(action: { activate(); store.goToParentOrPrompt() }) {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(store.canGoToParent ? Palette.accent : Palette.textMuted)
+                        .foregroundStyle(pane.canGoToParent ? Palette.accent : Palette.textMuted)
                         .frame(width: 22, height: 22)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(!store.canGoToParent)
+                .disabled(!pane.canGoToParent)
                 .help(loc.string(.goToParentTooltip))
 
                 Image(systemName: "folder.fill")
                     .foregroundStyle(Palette.accent)
-                Text(rootPath)
+                Text(root.url.path)
                     .font(.system(size: store.treeFontSize, design: .monospaced))
                     .foregroundStyle(Palette.textPrimary)
                     .lineLimit(1)
@@ -60,6 +74,9 @@ struct FileTreeView: View {
 
                 // 파일 필터 세그먼트 토글: [MD] | [전체]
                 fileFilterToggle
+
+                // 두 번째 트리 열기/닫기(⇧⌘D). 기본 트리에는 열기 토글, 두 번째 트리에는 닫기.
+                dualPaneButton
             }
             .padding(.horizontal, 8)
             .frame(height: 26)
@@ -74,16 +91,21 @@ struct FileTreeView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(store.visibleNodes) { node in
+                        ForEach(pane.visibleNodes) { node in
                             FileTreeRow(
                                 node: node,
                                 depth: depth(of: node),
-                                isExpanded: store.isExpanded(node),
-                                isSelected: store.selectedURL == node.url,
-                                isCursor: store.cursorURL == node.url,
-                                isMarked: store.isMarked(node.url),
+                                isExpanded: pane.expandedURLs.contains(node.url),
+                                // 뷰어에 열린 파일 강조는 그 파일을 연 트리에만 칠한다.
+                                isSelected: store.selectedURL == node.url && store.highlightsOpenFile(in: pane),
+                                // 듀얼 모드에서는 비활성 트리의 커서도 F5·F6의 보낼 항목이나 받을 폴더가
+                                // 되므로 알아볼 수 있게 남긴다.
+                                isInactivePane: store.isDualPane && store.activePane !== pane,
+                                isCursor: pane.cursorURL == node.url,
+                                isMarked: pane.markedURLs.contains(node.url),
                                 treeHasFocus: hasTreeFocus,
-                                isRenaming: store.renamingURL == node.url,
+                                // 같은 파일이 두 트리에 다 보여도 편집 칸은 작업 중인 트리에만 뜬다.
+                                isRenaming: store.renamingURL == node.url && store.activePane === pane,
                                 isDropTarget: dropTargetURL != nil && dropTargetURL == dropFolder(for: node)
                             )
                             .id(node.url)
@@ -96,8 +118,7 @@ struct FileTreeView: View {
                                 // 클릭한 행은 이미 화면에 있으므로 뒤따르는 커서 변경에
                                 // 스크롤이 붙지 않게 한다.
                                 suppressCursorScroll = true
-                                store.focus = .tree
-                                isFocused = true
+                                activate()
                                 // 더블클릭: 폴더면 그 폴더로 진입(새 루트). 파일이면 열기.
                                 if NSApp.currentEvent?.clickCount == 2 {
                                     if node.isDirectory {
@@ -129,18 +150,18 @@ struct FileTreeView: View {
                             }
                             .contextMenu {
                                 if node.isDirectory {
-                                    Button(loc.string(.enterFolder)) { store.enterFolder(node) }
+                                    Button(loc.string(.enterFolder)) { activate(); store.enterFolder(node) }
                                     Divider()
                                 }
-                                Button(loc.string(.newMarkdownFile)) { store.createMarkdownFile(near: node) }
-                                Button(loc.string(.newFolder)) { store.createFolder(near: node) }
+                                Button(loc.string(.newMarkdownFile)) { activate(); store.createMarkdownFile(near: node) }
+                                Button(loc.string(.newFolder)) { activate(); store.createFolder(near: node) }
                                 Divider()
                                 Button(loc.string(.openInTerminal)) { store.openInTerminal(near: node) }
                                 Divider()
                                 Button(loc.string(.copyPath)) { store.copyPath(node.url) }
-                                Button(loc.string(.copyRelativePath)) { store.copyRelativePath(node.url) }
+                                Button(loc.string(.copyRelativePath)) { activate(); store.copyRelativePath(node.url) }
                                 Divider()
-                                Button(loc.string(.rename)) { store.beginRename(node) }
+                                Button(loc.string(.rename)) { activate(); store.beginRename(node) }
                                 Button(loc.string(.delete), role: .destructive) { store.requestDelete(node) }
                             }
                             // 드래그 소스: 이 노드의 URL을 페이로드로.
@@ -164,7 +185,7 @@ struct FileTreeView: View {
                 // anchor를 주면 커서가 이미 보이는 경우에도 그 위치(가운데)로 목록을
                 // 끌어당겨, 한 칸 움직이거나 폴더를 펼칠 때마다 트리 전체가 흔들린다.
                 // nil이면 커서를 보이게 하는 데 필요한 최소량만 스크롤한다.
-                .onChange(of: store.cursorURL) { _, url in
+                .onChange(of: pane.cursorURL) { _, url in
                     // 마우스로 고른 행은 이미 눈앞에 있다. 클릭에는 스크롤하지 않는다
                     // (폴더를 펼칠 때 목록이 제자리에 있고 아래로만 늘어나게).
                     guard !suppressCursorScroll else {
@@ -179,10 +200,10 @@ struct FileTreeView: View {
             .background(Palette.panelBackground)
             // 빈 영역 우클릭 → 루트에 새 항목 생성.
             .contextMenu {
-                Button(loc.string(.newMarkdownFile)) { store.createMarkdownFile(near: nil) }
-                Button(loc.string(.newFolder)) { store.createFolder(near: nil) }
+                Button(loc.string(.newMarkdownFile)) { activate(); store.createMarkdownFile(near: nil) }
+                Button(loc.string(.newFolder)) { activate(); store.createFolder(near: nil) }
                 Divider()
-                Button(loc.string(.openInTerminal)) { store.openInTerminal(near: nil) }
+                Button(loc.string(.openInTerminal)) { activate(); store.openInTerminal(near: nil) }
             }
         }
         // ⌘+휠 확대 대상을 정하기 위해 마우스가 트리에 있음을 알린다.
@@ -192,33 +213,37 @@ struct FileTreeView: View {
         .focusable()
         .focused($isFocused)
         .focusEffectDisabled()
-        .onChange(of: store.focus) { _, newValue in
-            isFocused = (newValue == .tree)
-        }
+        // 키보드 포커스는 활성 트리 하나만 잡는다. 둘 다 잡으려 하면 서로 뺏으며 깜빡인다.
+        .onAppear { if hasTreeFocus { isFocused = true } }
+        .onChange(of: store.focus) { _, _ in isFocused = hasTreeFocus }
+        .onChange(of: store.activePaneIndex) { _, _ in isFocused = hasTreeFocus }
         .onKeyPress { press in handleKey(press) }
-        .alert(loc.string(.renameTitle),
-               isPresented: Binding(
-                get: { store.renameError != nil },
-                set: { if !$0 { store.renameError = nil } }
-               )) {
-            Button(loc.string(.ok), role: .cancel) { store.renameError = nil }
-        } message: {
-            Text(store.renameError ?? "")
-        }
-        .alert(loc.string(.deleteTitle),
-               isPresented: Binding(
-                get: { !store.pendingDeleteURLs.isEmpty },
-                set: { if !$0 { store.cancelDelete() } }
-               )) {
-            Button(loc.string(.cancel), role: .cancel) { store.cancelDelete() }
-            Button(loc.string(.moveToTrash), role: .destructive) { store.confirmDelete() }
-        } message: {
-            // 단일이면 파일명, 다중이면 "N개 항목을 휴지통으로?".
-            if store.pendingDeleteCount == 1 {
-                Text(loc.string(.confirmDelete(store.pendingDeleteName)))
-            } else {
-                Text(loc.string(.confirmDeleteMulti(store.pendingDeleteCount)))
+        // 이름 변경 오류·삭제 확인 창은 트리가 둘이어도 한 번만 떠야 하므로 ContentView가 띄운다.
+    }
+
+    /// 헤더의 두 번째 트리 버튼. 기본 트리에서는 열기/닫기 토글, 두 번째 트리에서는 닫기.
+    @ViewBuilder
+    private var dualPaneButton: some View {
+        if isSecondPane && store.isDualPane {
+            Button(action: { store.closeSecondPane() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Palette.textMuted)
+                    .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help("\(loc.string(.menuCloseSecondTree)) (⇧⌘D)")
+        } else if !isSecondPane {
+            Button(action: { store.toggleDualPane() }) {
+                Image(systemName: store.isDualPane ? "rectangle.split.2x1.fill" : "rectangle.split.2x1")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Palette.accent)
+                    .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("\(loc.string(store.isDualPane ? .menuCloseSecondTree : .menuOpenSecondTree)) (⇧⌘D)")
         }
     }
 
@@ -292,7 +317,7 @@ struct FileTreeView: View {
         case KeyEquivalent("\u{F746}"):    store.toggleMarkAndAdvance();  return .handled // Insert
         // Escape: 다중 선택 전체 해제(선택이 있을 때만 소비).
         case .escape:
-            if store.markedCount > 0 { store.clearMarks(); return .handled }
+            if !pane.markedURLs.isEmpty { store.clearMarks(); return .handled }
             return .ignored
         default:          return .ignored
         }
@@ -339,6 +364,8 @@ private struct FileTreeRow: View {
     let depth: Int
     let isExpanded: Bool
     let isSelected: Bool
+    /// 듀얼 모드에서 활성이 아닌 트리의 행인지.
+    let isInactivePane: Bool
     let isCursor: Bool
     let isMarked: Bool
     let treeHasFocus: Bool
@@ -408,7 +435,8 @@ private struct FileTreeRow: View {
             } else if isCursor && !isSelected {
                 // 키보드 커서 표시(선택과 별개).
                 RoundedRectangle(cornerRadius: 2)
-                    .strokeBorder(Palette.accent.opacity(treeHasFocus ? 0.9 : 0.4), lineWidth: 1)
+                    .strokeBorder(Palette.accent.opacity(treeHasFocus ? 0.9 : isInactivePane ? 0.7 : 0.4),
+                                  lineWidth: 1)
             }
         }
         .contentShape(Rectangle())
@@ -437,6 +465,7 @@ private struct FileTreeRow: View {
         if isSelected { return Palette.selectBackground }
         if isMarked { return Palette.accent.opacity(0.12) }   // 다중 선택 강조
         if isCursor && treeHasFocus { return Palette.accent.opacity(0.15) }
+        if isCursor && isInactivePane { return Palette.accent.opacity(0.08) }
         return .clear
     }
 

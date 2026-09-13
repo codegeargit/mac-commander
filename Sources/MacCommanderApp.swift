@@ -11,6 +11,13 @@ struct MacCommanderApp: App {
     @StateObject private var updater = UpdaterManager()
     @Environment(\.colorScheme) private var systemScheme
 
+    /// F5·F6을 쓸 수 있는지. 듀얼 모드에서는 보내는 쪽이 활성 트리가 아닐 수도 있어 따로 따진다.
+    private var canCopyOrMove: Bool {
+        store.isDualPane
+            ? store.transferSourcePaneIndex() != nil
+            : store.cursorURL != nil || store.markedCount > 0
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -87,12 +94,23 @@ struct MacCommanderApp: App {
                 Button("F4 · \(loc.string(.fkeyEdit))") { store.fkeyEdit() }
                     .keyboardShortcut(KeyEquivalent("\u{F707}"), modifiers: [])
                     .disabled(store.root == nil)
-                Button("F5 · \(loc.string(.fkeyCopy))") { store.fkeyCopyAtCursor() }
-                    .keyboardShortcut(KeyEquivalent("\u{F708}"), modifiers: [])
-                    .disabled(store.cursorURL == nil)
-                Button("F6 · \(loc.string(.fkeyRename))") { store.fkeyRenameAtCursor() }
-                    .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: [])
-                    .disabled(store.cursorURL == nil)
+                // 듀얼 모드에서는 Total Commander처럼 F5·F6이 반대편 트리로 복사·이동한다.
+                Button("F5 · \(loc.string(store.isDualPane ? .fkeyCopyToOther : .fkeyCopy))") {
+                    store.fkeyCopyAtCursor()
+                }
+                .keyboardShortcut(KeyEquivalent("\u{F708}"), modifiers: [])
+                .disabled(!canCopyOrMove)
+                Button("F6 · \(loc.string(store.isDualPane ? .fkeyMoveToOther : .fkeyRename))") {
+                    store.fkeyRenameAtCursor()
+                }
+                .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: [])
+                .disabled(!canCopyOrMove)
+                if store.isDualPane {
+                    // F6이 이동이 되므로 제자리 이름 변경은 ⇧F6으로 옮긴다(원작과 같다).
+                    Button("⇧F6 · \(loc.string(.fkeyRename))") { store.fkeyRenameInPlace() }
+                        .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: [.shift])
+                        .disabled(store.cursorURL == nil)
+                }
                 Button("F7 · \(loc.string(.fkeyNewFolder))") { store.createFolderAtCursor() }
                     .keyboardShortcut(KeyEquivalent("\u{F70A}"), modifiers: [])
                     .disabled(store.root == nil)
@@ -127,6 +145,23 @@ struct MacCommanderApp: App {
                 Button(loc.string(.menuRemovePanel)) { store.removeActivePanel() }
                     .keyboardShortcut("-", modifiers: [.command, .control])
                     .disabled(!store.canRemovePanel)
+                Divider()
+                // 두 번째 트리(Total Commander식 듀얼 모드)
+                Button(loc.string(store.isDualPane ? .menuCloseSecondTree : .menuOpenSecondTree)) {
+                    store.toggleDualPane()
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+                .disabled(store.primaryPane.root == nil)
+                Button(loc.string(.menuSwapTrees)) { store.swapPanes() }
+                    .keyboardShortcut("u", modifiers: .control)
+                    .disabled(!store.isDualPane)
+                // 커서 위치를 다른 트리에서도 연다(원작의 Ctrl+←/→). 화살표 방향으로 보낸다.
+                Button(loc.string(.menuSameLocationRight)) { store.showSameLocation(inPane: 1) }
+                    .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                    .disabled(store.primaryPane.root == nil)
+                Button(loc.string(.menuSameLocationLeft)) { store.showSameLocation(inPane: 0) }
+                    .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                    .disabled(!store.isDualPane)
                 Divider()
                 Button(loc.string(.menuFocusNext)) { store.focusNext() }
                     .keyboardShortcut(.tab, modifiers: [])
