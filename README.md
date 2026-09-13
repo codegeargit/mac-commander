@@ -21,8 +21,10 @@ macOS용 마크다운 파일 탐색 · 편집 앱. SwiftUI로 작성한 네이�
 
 Mac Commander는 모든 기능이 무료입니다. 도움이 되었다면 후원으로 개발을 응원해 주세요.
 
+- 💖 [GitHub Sponsors](https://github.com/sponsors/codegeargit) — 월 정기 · 일회성
 - ☕ [Buy Me a Coffee](https://buymeacoffee.com/codegear)
-- GitHub Sponsors와 후원자 혜택은 준비 중입니다
+
+후원자 키(앱 안 후원자 혜택)는 준비 중입니다.
 
 ## 직접 빌드하기
 

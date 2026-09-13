@@ -1,6 +1,5 @@
 # 리포 상단 Sponsor 버튼에 표시되는 후원 창구.
+github: codegeargit
 buy_me_a_coffee: codegear
-# GitHub Sponsors 심사가 끝나면 주석을 푼다(프로필이 없으면 링크가 404).
-# github: codegeargit
 # Creem 후원자 키 라이브 체크아웃 주소가 생기면 추가한다.
 # custom: ["https://www.creem.io/payment/<라이브 상품 ID>"]
