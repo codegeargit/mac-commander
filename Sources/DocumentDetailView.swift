@@ -155,6 +155,8 @@ struct DocumentDetailView: View {
             }
         }
         .background(Palette.viewerBackground)
+        // Tab으로 이 패널에 오면 화살표 키가 문서로 가게 키보드 포커스를 본문으로 옮긴다.
+        .background(PanelKeyFocus(isFocused: store.focus == .panel(panelIndex)))
         // ⌘+휠 확대 대상을 정하기 위해 마우스가 이 패널에 있음을 알린다.
         .onHover { inside in
             if inside { store.hoverArea = .panel(panelIndex) }
@@ -490,3 +492,48 @@ struct DocumentDetailView: View {
         .help(help)
     }
 }
+
+/// Tab으로 뷰어 패널에 포커스가 오면 키보드 입력을 문서 본문으로 넘긴다.
+///
+/// 스토어의 `focus`는 어느 영역이 작업 중인지만 기록하고 실제 키보드 포커스(first responder)는
+/// 옮기지 않는다. 그래서 Tab으로 뷰어에 와도 화살표 키가 트리에도 문서에도 가지 않았다. 마우스로
+/// 누르면 AppKit이 옮겨 주던 일을 Tab일 때 대신 한다. 문서 종류마다 뷰가 달라(WebView·PDFView·
+/// 텍스트 뷰·QuickLook) 패널 가운데에 놓인 뷰에서 키를 받을 수 있는 가장 가까운 뷰를 고른다.
+private struct PanelKeyFocus: NSViewRepresentable {
+    let isFocused: Bool
+
+    func makeNSView(context: Context) -> AnchorView { AnchorView() }
+
+    func updateNSView(_ view: AnchorView, context: Context) {
+        guard isFocused != view.wasFocused else { return }
+        view.wasFocused = isFocused
+        guard isFocused else { return }
+        // 트리가 포커스를 내려놓은 뒤에 옮기도록 한 틱 미룬다.
+        DispatchQueue.main.async { view.focusContent() }
+    }
+
+    final class AnchorView: NSView {
+        var wasFocused = false
+
+        // 클릭은 위에 놓인 문서 뷰가 받는다.
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        func focusContent() {
+            guard let window, let contentView = window.contentView,
+                  let frameView = contentView.superview else { return }
+            let panelRect = convert(bounds, to: nil)
+            let center = NSPoint(x: panelRect.midX, y: panelRect.midY)
+            var candidate = contentView.hitTest(frameView.convert(center, from: nil))
+            while let view = candidate, !view.acceptsFirstResponder { candidate = view.superview }
+            guard let target = candidate else { return }
+
+            // 이미 이 패널 안에서 키를 받고 있으면 그대로 둔다(본문을 클릭했거나 찾기 칸에 입력 중).
+            if let current = window.firstResponder as? NSView {
+                if current === target || current.isDescendant(of: target) { return }
+                if panelRect.contains(current.convert(current.bounds, to: nil)) { return }
+            }
+            window.makeFirstResponder(target)
+        }
+    }
+}
+

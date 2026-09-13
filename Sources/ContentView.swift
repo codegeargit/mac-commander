@@ -130,6 +130,12 @@ struct ContentView: View {
                 .environmentObject(store)
                 .environmentObject(loc)
         }
+        // Tab·⇧Tab: 트리 → 두 번째 트리 → 뷰어 순으로 포커스 이동.
+        .background(FocusCycleKeyCatcher { backward in
+            guard store.primaryPane.root != nil else { return false }
+            backward ? store.focusPrevious() : store.focusNext()
+            return true
+        })
         // 창 전체에 폴더 드래그앤드롭 지원
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             handleDrop(providers)
@@ -300,3 +306,56 @@ struct ContentView: View {
     }
 }
 
+/// Tab·⇧Tab을 받아 트리·뷰어 사이 포커스를 옮긴다.
+///
+/// 메뉴의 `keyboardShortcut(.tab)`만으로는 동작하지 않는다. macOS는 ⌘·⌃ 같은 수식키 없이 누른 키를
+/// 메뉴로 보내지 않고(F키는 예외) 포커스된 뷰로 곧장 보내서, Tab이 트리 뷰의 기본 포커스 처리에
+/// 먹혀 아무 일도 일어나지 않았다. 그래서 이 창으로 들어오는 Tab을 앱 이벤트 큐에서 먼저 받는다.
+/// 글자를 입력하는 곳(이름 변경·찾기·편집기)과 터미널에서는 Tab이 할 일이 있으므로 그대로 흘려보낸다.
+private struct FocusCycleKeyCatcher: NSViewRepresentable {
+    /// Tab을 처리했으면 true(이벤트를 삼킨다). 인자는 ⇧Tab 여부.
+    let onTab: (_ backward: Bool) -> Bool
+
+    func makeNSView(context: Context) -> CatcherView {
+        let view = CatcherView()
+        view.onTab = onTab
+        return view
+    }
+
+    func updateNSView(_ view: CatcherView, context: Context) {
+        view.onTab = onTab
+    }
+
+    final class CatcherView: NSView {
+        var onTab: ((Bool) -> Bool)?
+        private var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window != nil, monitor == nil {
+                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    guard let self else { return event }
+                    return self.handle(event)
+                }
+            } else if window == nil, let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        deinit {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+        }
+
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            // 이 창의 Tab만. 확인 창 같은 시트가 떠 있으면 그 안의 Tab은 시트 몫이다.
+            guard event.keyCode == 48,
+                  let window, event.window === window, window.attachedSheet == nil else { return event }
+            let mods = event.modifierFlags.intersection([.shift, .control, .option, .command])
+            guard mods.isEmpty || mods == .shift else { return event }
+            if let text = window.firstResponder as? NSTextView, text.isEditable { return event }
+            if window.firstResponder is CommanderTerminalView { return event }
+            return onTab?(mods == .shift) == true ? nil : event
+        }
+    }
+}

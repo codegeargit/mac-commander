@@ -22,11 +22,21 @@ struct PlainTextView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    final class Coordinator: NSObject {
+    final class Coordinator: NSObject, NSTextViewDelegate {
         /// 이미 반영한 본문·서식. 같으면 다시 설정하지 않아 스크롤 위치가 유지된다.
         var appliedKey: String = ""
         var lastFindRequest: FindRequest?
         var onZoomStep: ((Int) -> Void)?
+
+        /// 읽기 전용이라 ↑↓로 보이지 않는 커서를 옮기는 대신 문서를 한 줄씩 스크롤한다.
+        /// 커서만 움직이면 화면 끝에 닿을 때까지 아무 변화가 없어 키가 안 먹는 것처럼 보인다.
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            switch commandSelector {
+            case #selector(NSResponder.moveDown(_:)): textView.scrollLineDown(nil); return true
+            case #selector(NSResponder.moveUp(_:)):   textView.scrollLineUp(nil); return true
+            default: return false
+            }
+        }
 
         /// 마지막으로 글자 크기를 한 단계 옮긴 시점의 누적 배율.
         private var lastSteppedMagnification: CGFloat = 0
@@ -68,6 +78,7 @@ struct PlainTextView: NSViewRepresentable {
             textView.textContainerInset = NSSize(width: 20, height: 16)
             // 폭에 맞춰 줄바꿈한다(기존 Text 표시와 동일).
             textView.textContainer?.widthTracksTextView = true
+            textView.delegate = context.coordinator
         }
         context.coordinator.onZoomStep = onZoomStep
         apply(scrollView, context: context)
