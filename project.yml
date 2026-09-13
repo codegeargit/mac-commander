@@ -55,8 +55,8 @@ targets:
         #                               "유일한" 기준(appcast의 sparkle:version)이다.
         #                               표시 버전 형식과 무관하게 릴리스마다 정수로
         #                               1씩 올린다. 되돌리거나 건너뛰면 안 된다.
-        CFBundleShortVersionString: "1.13.3"
-        CFBundleVersion: "17"
+        CFBundleShortVersionString: "1.13.4"
+        CFBundleVersion: "18"
         LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: "© 2026 CodeGear"
         # Sparkle 자동 업데이트 설정.
