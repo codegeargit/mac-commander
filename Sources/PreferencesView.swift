@@ -23,14 +23,22 @@ struct PreferencesView: View {
                 get: { theme.effectiveTheme },
                 set: { theme.theme = $0 }
             )) {
-                ForEach(theme.selectableThemes) { t in
-                    Text(t.isSupporterOnly ? "💖 \(t.displayName(loc.language))" : t.displayName(loc.language))
-                        .tag(t)
+                let themes = theme.selectableThemes
+                ForEach(themes.filter { !$0.isSupporterOnly }) { t in
+                    Text(t.displayName(loc.language)).tag(t)
+                }
+                // 후원자 테마는 구분선 아래에 모은다(키가 있을 때만 목록에 들어온다).
+                let supporterThemes = themes.filter(\.isSupporterOnly)
+                if !supporterThemes.isEmpty {
+                    Divider()
+                    ForEach(supporterThemes) { t in
+                        Text("💖 \(t.displayName(loc.language))").tag(t)
+                    }
                 }
             }
             // 후원자 테마 안내 — 키를 받을 수 있는 빌드에서, 아직 키가 없을 때만.
             if showsSupporterKeyUI && !theme.supporterUnlocked {
-                Text(loc.string(.supporterThemesHint))
+                Text(loc.string(.supporterThemesHint(AppTheme.supporterThemeCount)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -144,7 +152,7 @@ struct PreferencesView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Text(loc.string(.supporterKeyHint))
+            Text(loc.string(.supporterKeyHint(AppTheme.supporterThemeCount)))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

@@ -7,10 +7,15 @@ enum AppTheme: String, CaseIterable, Identifiable {
     case dark        // 표준 다크(중립)
     case light       // 라이트
     case system      // macOS 설정에 따라 dark/light 자동
-    // 후원자 테마 — 후원자 키가 있을 때만 고를 수 있다.
-    case nord            // 차분한 청회색 다크
-    case dracula         // 보라 강조 다크
-    case solarizedLight  // 따뜻한 종이색 라이트
+    // 후원자 테마 — 후원자 키가 있을 때만 고를 수 있다. 다크 먼저, 라이트 나중(선택 목록 순서).
+    case nord             // 차분한 청회색 다크
+    case dracula          // 보라 강조 다크
+    case gruvboxDark      // 따뜻한 갈색·노랑 레트로 다크
+    case catppuccinMocha  // 파스텔 다크(핑크 강조)
+    case everforestDark   // 숲 느낌의 초록 다크
+    case solarizedLight   // 따뜻한 종이색 라이트
+    case catppuccinLatte  // 파스텔 라이트(보라 강조)
+    case rosePineDawn     // 장밋빛 라이트
 
     var id: String { rawValue }
 
@@ -19,10 +24,14 @@ enum AppTheme: String, CaseIterable, Identifiable {
     /// 후원자 혜택은 기능이 아니라 꾸미기만 연다. 기본 테마 넷으로 앱은 이미 온전하다.
     var isSupporterOnly: Bool {
         switch self {
-        case .nord, .dracula, .solarizedLight: return true
         case .default, .dark, .light, .system: return false
+        case .nord, .dracula, .gruvboxDark, .catppuccinMocha, .everforestDark,
+             .solarizedLight, .catppuccinLatte, .rosePineDawn: return true
         }
     }
+
+    /// 후원자 테마 개수(안내 문구용). 테마를 늘려도 문구를 따로 고치지 않게 센다.
+    static var supporterThemeCount: Int { allCases.filter(\.isSupporterOnly).count }
 
     func displayName(_ lang: AppLanguage) -> String {
         switch self {
@@ -30,9 +39,14 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .dark:    return lang == .korean ? "다크" : "Dark"
         case .light:   return lang == .korean ? "라이트" : "Light"
         case .system:  return lang == .korean ? "시스템" : "System"
-        case .nord:           return "Nord"
-        case .dracula:        return "Dracula"
-        case .solarizedLight: return "Solarized Light"
+        case .nord:            return "Nord"
+        case .dracula:         return "Dracula"
+        case .gruvboxDark:     return "Gruvbox Dark"
+        case .catppuccinMocha: return "Catppuccin Mocha"
+        case .everforestDark:  return "Everforest Dark"
+        case .solarizedLight:  return "Solarized Light"
+        case .catppuccinLatte: return "Catppuccin Latte"
+        case .rosePineDawn:    return "Rosé Pine Dawn"
         }
     }
 }
@@ -162,6 +176,66 @@ struct ColorSet {
         textWarning: Color(hex: 0xFF6E6E)
     )
 
+    /// Gruvbox Dark — 따뜻한 갈색·노랑 레트로 다크.
+    static let gruvboxDark = ColorSet(
+        panelBackground: Color(hex: 0x32302F),
+        viewerBackground: Color(hex: 0x282828),
+        headerBackground: Color(hex: 0x504945),
+        headerBackgroundInactive: Color(hex: 0x3C3836),
+        accent: Color(hex: 0xFABD2F),
+        accentDim: Color(hex: 0xD79921),
+        textPrimary: Color(hex: 0xEBDBB2),
+        textHeading: Color(hex: 0xFBF1C7),
+        textFolder: Color(hex: 0x8EC07C),
+        textMuted: Color(hex: 0xA89984),
+        selectBackground: Color(hex: 0xFABD2F),
+        selectForeground: Color(hex: 0x282828),
+        divider: Color(hex: 0x45403D),
+        codeBlockBackground: Color(hex: 0x32302F),
+        codeInlineBackground: Color(hex: 0x3C3836),
+        textWarning: Color(hex: 0xFB4934)
+    )
+
+    /// Catppuccin Mocha — 파스텔 다크, 핑크 강조.
+    static let catppuccinMocha = ColorSet(
+        panelBackground: Color(hex: 0x181825),
+        viewerBackground: Color(hex: 0x1E1E2E),
+        headerBackground: Color(hex: 0x313244),
+        headerBackgroundInactive: Color(hex: 0x232334),
+        accent: Color(hex: 0xF5C2E7),
+        accentDim: Color(hex: 0x7F849C),
+        textPrimary: Color(hex: 0xCDD6F4),
+        textHeading: Color(hex: 0xF0F3FF),
+        textFolder: Color(hex: 0x89DCEB),
+        textMuted: Color(hex: 0x9399B2),
+        selectBackground: Color(hex: 0xF5C2E7),
+        selectForeground: Color(hex: 0x1E1E2E),
+        divider: Color(hex: 0x313244),
+        codeBlockBackground: Color(hex: 0x181825),
+        codeInlineBackground: Color(hex: 0x313244),
+        textWarning: Color(hex: 0xF38BA8)
+    )
+
+    /// Everforest Dark — 숲 느낌의 초록 다크.
+    static let everforestDark = ColorSet(
+        panelBackground: Color(hex: 0x232A2E),
+        viewerBackground: Color(hex: 0x2D353B),
+        headerBackground: Color(hex: 0x3D484D),
+        headerBackgroundInactive: Color(hex: 0x343F44),
+        accent: Color(hex: 0xA7C080),
+        accentDim: Color(hex: 0x6F8A5C),
+        textPrimary: Color(hex: 0xD3C6AA),
+        textHeading: Color(hex: 0xE8DFC7),
+        textFolder: Color(hex: 0x7FBBB3),
+        textMuted: Color(hex: 0x9DA9A0),
+        selectBackground: Color(hex: 0xA7C080),
+        selectForeground: Color(hex: 0x2D353B),
+        divider: Color(hex: 0x414B50),
+        codeBlockBackground: Color(hex: 0x343F44),
+        codeInlineBackground: Color(hex: 0x3D484D),
+        textWarning: Color(hex: 0xE67E80)
+    )
+
     /// Solarized Light — 따뜻한 종이색 라이트.
     static let solarizedLight = ColorSet(
         panelBackground: Color(hex: 0xEEE8D5),
@@ -180,6 +254,46 @@ struct ColorSet {
         codeBlockBackground: Color(hex: 0xEEE8D5),
         codeInlineBackground: Color(hex: 0xF2ECDA),
         textWarning: Color(hex: 0xDC322F)
+    )
+
+    /// Catppuccin Latte — 파스텔 라이트, 보라 강조.
+    static let catppuccinLatte = ColorSet(
+        panelBackground: Color(hex: 0xE6E9EF),
+        viewerBackground: Color(hex: 0xEFF1F5),
+        headerBackground: Color(hex: 0xDCE0E8),
+        headerBackgroundInactive: Color(hex: 0xE2E5EB),
+        accent: Color(hex: 0x8839EF),
+        accentDim: Color(hex: 0xAE8AF5),
+        textPrimary: Color(hex: 0x4C4F69),
+        textHeading: Color(hex: 0x303246),
+        textFolder: Color(hex: 0x1654D0),   // 원본 blue(#1E66F5)보다 진하게 — 패널 배경에서 대비 확보
+        textMuted: Color(hex: 0x6C6F85),
+        selectBackground: Color(hex: 0x8839EF),
+        selectForeground: Color(hex: 0xEFF1F5),
+        divider: Color(hex: 0xCCD0DA),
+        codeBlockBackground: Color(hex: 0xE6E9EF),
+        codeInlineBackground: Color(hex: 0xDCE0E8),
+        textWarning: Color(hex: 0xD20F39)
+    )
+
+    /// Rosé Pine Dawn — 장밋빛이 도는 라이트.
+    static let rosePineDawn = ColorSet(
+        panelBackground: Color(hex: 0xF2E9E1),
+        viewerBackground: Color(hex: 0xFAF4ED),
+        headerBackground: Color(hex: 0xE7DDD4),
+        headerBackgroundInactive: Color(hex: 0xEEE4DB),
+        accent: Color(hex: 0xB4637A),
+        accentDim: Color(hex: 0xD7827E),
+        textPrimary: Color(hex: 0x575279),
+        textHeading: Color(hex: 0x3E3A5C),
+        textFolder: Color(hex: 0x286983),
+        textMuted: Color(hex: 0x797593),
+        selectBackground: Color(hex: 0xB4637A),
+        selectForeground: Color(hex: 0xFAF4ED),
+        divider: Color(hex: 0xDFDAD9),
+        codeBlockBackground: Color(hex: 0xF4EDE8),
+        codeInlineBackground: Color(hex: 0xEEE4DB),
+        textWarning: Color(hex: 0xB03A2E)   // 강조색(장미색)과 구분되는 붉은 주황
     )
 }
 
@@ -229,27 +343,34 @@ final class ThemeManager: ObservableObject {
         case .dark:    return .dark
         case .light:   return .light
         case .system:  return systemIsDark ? .dark : .light
-        case .nord:           return .nord
-        case .dracula:        return .dracula
-        case .solarizedLight: return .solarizedLight
+        case .nord:            return .nord
+        case .dracula:         return .dracula
+        case .gruvboxDark:     return .gruvboxDark
+        case .catppuccinMocha: return .catppuccinMocha
+        case .everforestDark:  return .everforestDark
+        case .solarizedLight:  return .solarizedLight
+        case .catppuccinLatte: return .catppuccinLatte
+        case .rosePineDawn:    return .rosePineDawn
         }
     }
 
     /// 현재 테마가 어두운 계열인지(mermaid 등 WebView 렌더러의 테마 선택에 사용).
     var isDark: Bool {
         switch effectiveTheme {
-        case .default, .dark, .nord, .dracula: return true
-        case .light, .solarizedLight:          return false
-        case .system:                          return systemIsDark
+        case .default, .dark, .nord, .dracula, .gruvboxDark, .catppuccinMocha, .everforestDark:
+            return true
+        case .light, .solarizedLight, .catppuccinLatte, .rosePineDawn:
+            return false
+        case .system:
+            return systemIsDark
         }
     }
 
     /// SwiftUI 창에 줄 색 구성(nil=시스템 따름).
     var preferredColorScheme: ColorScheme? {
         switch effectiveTheme {
-        case .default, .dark, .nord, .dracula: return .dark
-        case .light, .solarizedLight:          return .light
-        case .system:                          return nil
+        case .system: return nil
+        default:      return isDark ? .dark : .light
         }
     }
 
@@ -274,8 +395,18 @@ final class ThemeManager: ObservableObject {
             return (NSColor(hex: 0x2E3440), NSColor(hex: 0xD8DEE9), NSColor(hex: 0x88C0D0))
         case .dracula:
             return (NSColor(hex: 0x282A36), NSColor(hex: 0xF8F8F2), NSColor(hex: 0xBD93F9))
+        case .gruvboxDark:
+            return (NSColor(hex: 0x282828), NSColor(hex: 0xEBDBB2), NSColor(hex: 0xFABD2F))
+        case .catppuccinMocha:
+            return (NSColor(hex: 0x1E1E2E), NSColor(hex: 0xCDD6F4), NSColor(hex: 0xF5C2E7))
+        case .everforestDark:
+            return (NSColor(hex: 0x2D353B), NSColor(hex: 0xD3C6AA), NSColor(hex: 0xA7C080))
         case .solarizedLight:
             return (NSColor(hex: 0xFDF6E3), NSColor(hex: 0x586E75), NSColor(hex: 0x268BD2))
+        case .catppuccinLatte:
+            return (NSColor(hex: 0xEFF1F5), NSColor(hex: 0x4C4F69), NSColor(hex: 0x8839EF))
+        case .rosePineDawn:
+            return (NSColor(hex: 0xFAF4ED), NSColor(hex: 0x575279), NSColor(hex: 0xB4637A))
         }
     }
 }

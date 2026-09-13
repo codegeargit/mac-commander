@@ -223,8 +223,8 @@ enum L10n {
     case licenseStatusActive // 상태: 후원자 키 활성
     case licenseStatusNone   // 상태: 후원자 키 없음
     case supporterKeyGet     // 후원자 키 결제(체크아웃) 링크
-    case supporterKeyHint    // 후원자 키 섹션 안내 문구
-    case supporterThemesHint // 테마 선택 아래: 후원자 테마 안내
+    case supporterKeyHint(Int)    // 후원자 키 섹션 안내 문구(후원자 테마 개수)
+    case supporterThemesHint(Int) // 테마 선택 아래: 후원자 테마 안내(개수)
     case aboutSupporterThanks // About 패널: 후원자 감사 인사
     case aboutSupportersTitle // About 패널: 후원자 크레딧 제목
     case supportMenu         // 도움말 메뉴: 후원하기
@@ -514,12 +514,12 @@ enum L10n {
         case .licenseStatusActive: ko = "후원자 키 활성 — 고맙습니다!"; en = "Supporter key active — thank you!"
         case .licenseStatusNone: ko = "후원자 키 없음"; en = "No supporter key"
         case .supporterKeyGet:  ko = "후원자 키 받기"; en = "Get a Supporter Key"
-        case .supporterKeyHint:
-            ko = "후원자 키가 없어도 모든 기능을 쓸 수 있습니다. 키가 있으면 후원자 테마 3종과 후원자 배지가 열립니다."
-            en = "Every feature works without a supporter key. A key unlocks three supporter themes and a supporter badge."
-        case .supporterThemesHint:
-            ko = "후원자 키가 있으면 테마 3종(Nord · Dracula · Solarized Light)이 더 열립니다."
-            en = "A supporter key unlocks three more themes (Nord · Dracula · Solarized Light)."
+        case .supporterKeyHint(let count):
+            ko = "후원자 키가 없어도 모든 기능을 쓸 수 있습니다. 키가 있으면 후원자 테마 \(count)종과 후원자 배지가 열립니다."
+            en = "Every feature works without a supporter key. A key unlocks \(count) supporter themes and a supporter badge."
+        case .supporterThemesHint(let count):
+            ko = "후원자 키가 있으면 테마 \(count)종(Nord · Dracula · Gruvbox · Catppuccin 등)이 더 열립니다."
+            en = "A supporter key unlocks \(count) more themes (Nord, Dracula, Gruvbox, Catppuccin and more)."
         case .aboutSupporterThanks: ko = "💖 후원해 주셔서 고맙습니다"; en = "💖 Thank you for supporting Mac Commander"
         case .aboutSupportersTitle: ko = "후원해 주신 분들"; en = "Supporters"
         case .supportMenu:      ko = "Mac Commander 후원하기…"; en = "Sponsor Mac Commander…"
