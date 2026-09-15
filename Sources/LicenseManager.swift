@@ -8,7 +8,7 @@ import Security
 /// 오프라인·서버 오류 시엔 마지막 성공 시각 기준 유예 기간 동안 후원자 상태를 유지한다.
 ///
 /// Keychain·UserDefaults의 저장 이름은 Pro 라이선스 시절의 것을 그대로 쓴다.
-/// 바꾸면 이미 활성화해 둔 키를 잃는다.
+/// 바꾸면 이미 활성화해 둔 키를 잃는다. 개발 빌드만 이름 뒤에 `.debug`를 붙인다(`Key.suffix`).
 @MainActor
 final class LicenseManager: ObservableObject {
     static let shared = LicenseManager()
@@ -26,10 +26,19 @@ final class LicenseManager: ObservableObject {
     private let defaults = UserDefaults.standard
 
     private enum Key {
-        static let lastValidated = "license.lastValidatedAt"  // Date
-        static let cachedEmail   = "license.email"            // String?
+        /// 개발 빌드는 테스트 키·테스트 프록시를 쓰므로 저장 이름 뒤에 붙여 릴리스의 라이브 키와 나눈다.
+        /// 같은 Mac에서 두 빌드를 번갈아 실행해도 서로의 키와 기기 등록을 건드리지 않는다.
+        /// 서명이 다른 빌드가 만든 키체인 항목을 읽으려다 암호 창이 뜨는 일도 막는다.
+        #if DEBUG
+        static let suffix = ".debug"
+        #else
+        static let suffix = ""
+        #endif
+
+        static let lastValidated = "license.lastValidatedAt" + suffix  // Date
+        static let cachedEmail   = "license.email" + suffix            // String?
         /// 활성화 때 서버가 준 이 기기의 등록 식별자. 비밀이 아니라 기기 구분용이다.
-        static let instanceId    = "license.instanceId"        // String?
+        static let instanceId    = "license.instanceId" + suffix        // String?
     }
 
     /// 서버에 등록된 이 기기의 식별자. 검증과 해제에 쓴다.
@@ -46,7 +55,7 @@ final class LicenseManager: ObservableObject {
         Host.current().localizedName ?? ProcessInfo.processInfo.hostName
     }
     /// Keychain 아이템 식별.
-    private static let keychainService = "ai.codegear.MacCommander.license"
+    private static let keychainService = "ai.codegear.MacCommander.license" + Key.suffix
     private static let keychainAccount = "licenseKey"
 
     /// 오프라인/서버오류 시 후원자 상태를 유지해 주는 유예 기간(마지막 성공 검증 이후).

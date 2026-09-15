@@ -17,12 +17,12 @@ enum AppLinks {
     ///
     /// Creem은 테스트와 라이브의 상품이 별개라 주소가 다르다. 테스트 링크가 실판매 빌드에
     /// 섞이면 후원자가 테스트 카드로 결제하고 아무것도 못 받는 사고가 나므로 빌드별로 분리한다.
+    /// 키를 검증하는 프록시(`CreemLicenseProvider.proxyBase`)도 같은 기준으로 나뉜다.
     static let supporterCheckout: URL? = {
         #if DEBUG
         return URL(string: "https://www.creem.io/test/payment/prod_5iWRKUMyFQgMtgZjEozSh4")
         #else
-        // 라이브 상품을 만든 뒤 주소를 채운다. 그전까지는 키 입력 안내만 나간다.
-        return nil
+        return URL(string: "https://www.creem.io/payment/prod_4Z71U0yqagFSrY9cS0zv3I")
         #endif
     }()
     /// 유튜브 채널.

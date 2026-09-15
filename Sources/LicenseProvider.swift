@@ -72,8 +72,17 @@ struct MockLicenseProvider: LicenseProvider {
 /// 사이에 두고, 앱은 비밀 없이 프록시만 호출한다. 프록시 소스는 비공개 리포(mac-commander-license-proxy)에 있다.
 struct CreemLicenseProvider: LicenseProvider {
     /// 프록시 주소(라이선스 프록시를 배포한 Worker).
-    /// 앱은 이 주소만 알면 되고, 테스트↔라이브 전환은 프록시 쪽 설정만 바꾸면 된다.
-    static let proxyBase = URL(string: "https://mac-commander-license.maccommander.workers.dev")!
+    ///
+    /// Creem은 테스트와 라이브의 키가 서로 통하지 않는다. 개발 빌드는 테스트 체크아웃에서 받은
+    /// 테스트 키를 쓰므로 테스트 Worker를, 릴리스는 라이브 Worker를 부른다.
+    /// `AppLinks.supporterCheckout`과 같은 기준(DEBUG)으로 나눠야 결제와 검증이 어긋나지 않는다.
+    static let proxyBase: URL = {
+        #if DEBUG
+        return URL(string: "https://mac-commander-license-test.maccommander.workers.dev")!
+        #else
+        return URL(string: "https://mac-commander-license.maccommander.workers.dev")!
+        #endif
+    }()
 
     /// 프록시 주소가 실제 값으로 채워졌는지.
     /// 자리표시자를 그대로 둔 채 배포되면 키가 조용히 무효가 되는 대신 "연결 불가"로 드러난다.
