@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개인정보처리방침 — Mac Commander</title>
+<meta name="description" content="Mac Commander 앱과 소개 페이지의 개인정보 처리 방침.">
+<link rel="icon" href="icon.png">
+<style>
+:root{
+  --navy:#0A1A33;
+  --header:#10325C;
+  --accent:#33CCFF;
+  --text:#E6F1FF;
+  --muted:#7A8CA3;
+  --body:#C3D5EA;
+  --divider:#1C2F4A;
+  --page:#050D1A;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--page);color:var(--body);
+  font-family:var(--sans);font-size:15px;line-height:1.75;
+  -webkit-font-smoothing:antialiased;word-break:keep-all;overflow-wrap:break-word;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+.pathbar{
+  position:sticky;top:0;z-index:10;
+  display:flex;align-items:center;gap:10px;
+  height:40px;padding:0 16px;
+  background:var(--header);border-bottom:1px solid var(--divider);
+  font-family:var(--mono);font-size:12.5px;color:var(--text);
+}
+.pathbar img{width:20px;height:20px;border-radius:5px;display:block}
+.pathbar .home{display:flex;align-items:center;gap:8px;color:var(--text);font-weight:600}
+.pathbar .right{margin-left:auto;display:flex;gap:14px}
+.pathbar .right a{color:var(--text);opacity:.75}
+.pathbar .right a:hover{opacity:1;color:var(--accent);text-decoration:none}
+main{max-width:760px;margin:0 auto;padding-block:36px 64px;padding-inline:16px}
+article + article{margin-top:56px;padding-top:40px;border-top:1px solid var(--divider)}
+h1{color:var(--text);font-size:clamp(24px,4vw,30px);line-height:1.3;margin:0 0 6px;letter-spacing:-.01em}
+.updated{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:0 0 28px}
+h2{color:var(--text);font-size:17px;margin:34px 0 8px}
+p,ul{margin:0 0 12px}
+ul{padding-left:22px}
+li{margin:4px 0}
+strong{color:var(--text)}
+code{font-family:var(--mono);font-size:13px;color:var(--text)}
+footer{
+  max-width:760px;margin:0 auto;padding-block:0 32px;padding-inline:16px;
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+}
+</style>
+</head>
+<body>
+
+<header class="pathbar">
+  <a class="home" href="./"><img src="icon.png" alt=""> Mac Commander</a>
+  <span class="right">
+    <a href="#ko" lang="ko">한국어</a>
+    <a href="#en" lang="en">English</a>
+  </span>
+</header>
+
+<main>
+
+<article id="ko" lang="ko">
+  <h1>개인정보처리방침</h1>
+  <p class="updated">시행일: 2026년 9월 15일</p>
+
+  <p>
+    이 방침은 CodeGear(이하 "개발자")가 배포하는 macOS 앱 <strong>Mac Commander</strong>(이하 "앱")와
+    소개 페이지(이하 "웹사이트")가 어떤 정보를 어디로 보내고, 어떻게 다루는지 설명합니다.
+  </p>
+
+  <h2>1. 요약</h2>
+  <ul>
+    <li>앱에는 회원 가입, 사용 통계 수집, 광고, 추적 기능이 없습니다.</li>
+    <li>앱은 사용자가 연 파일을 Mac 안에서만 다루며, 파일 내용을 개발자나 다른 곳으로 보내지 않습니다.</li>
+    <li>외부와 통신하는 경우는 아래 2~4항에 적은 것뿐입니다.</li>
+  </ul>
+
+  <h2>2. 자동 업데이트</h2>
+  <p>
+    앱은 Sparkle 프레임워크로 하루 한 번 새 버전이 있는지 확인합니다. 이때 GitHub(배포 저장소)에 접속하며,
+    GitHub는 IP 주소, 앱 이름과 버전 같은 일반적인 요청 정보를 받습니다. 이 요청에는 개인을 식별하는 정보를
+    따로 담지 않습니다.
+  </p>
+
+  <h2>3. 후원자 키(선택)</h2>
+  <p>후원자 키는 선택 사항이며, 키를 입력한 경우에만 다음 정보가 전송됩니다.</p>
+  <ul>
+    <li><strong>보내는 정보</strong>: 후원자 키, 이 Mac의 이름(시스템 설정의 컴퓨터 이름), 활성화 때 발급받은 기기 등록 식별자</li>
+    <li><strong>목적</strong>: 키의 유효성 확인, 기기별 활성화(키 하나당 최대 5대)와 해제</li>
+    <li><strong>경로</strong>: 개발자가 Cloudflare Workers에서 운영하는 검증 서버를 거쳐 결제 대행사 Creem으로 전달됩니다. 검증 서버는 요청 내용을 따로 저장하지 않습니다.</li>
+    <li><strong>Mac에 저장되는 정보</strong>: 키는 macOS 키체인에, 기기 등록 식별자·마지막 확인 시각·구매 이메일은 앱 설정에 저장됩니다. 앱에서 키를 해제하면 함께 지워집니다.</li>
+  </ul>
+
+  <h2>4. 문서 뷰어</h2>
+  <p>
+    사용자가 연 마크다운·HTML 문서 안에 외부 이미지나 리소스 주소가 들어 있으면, 뷰어는 웹 브라우저처럼
+    그 주소에서 해당 리소스를 불러옵니다. 이 요청은 문서에 적힌 서버로 가며 개발자는 관여하지 않습니다.
+  </p>
+
+  <h2>5. 결제</h2>
+  <p>
+    후원자 키 결제는 판매 대행사(Merchant of Record)인 <strong>Creem</strong>이 처리합니다.
+    이름, 이메일, 결제 수단, 청구지 같은 결제 정보는 Creem이 수집하며
+    <a href="https://www.creem.io/privacy">Creem 개인정보처리방침</a>을 따릅니다.
+    개발자는 카드 정보를 받지 않으며, 키 발급과 문의 대응에 필요한 주문 정보(이메일, 주문 내역)만 Creem 대시보드에서 확인합니다.
+  </p>
+
+  <h2>6. 웹사이트</h2>
+  <ul>
+    <li>웹사이트는 GitHub Pages로 제공되며, GitHub가 접속 기록(IP 주소 등)을 처리할 수 있습니다.</li>
+    <li>글꼴을 Google Fonts에서, 후원 카드를 GitHub에서 불러오고, 다운로드 수를 GitHub API로 조회합니다. 이 과정에서 각 서비스가 IP 주소 등을 받을 수 있습니다.</li>
+    <li>개발자는 웹사이트에 쿠키, 방문 분석, 광고 스크립트를 쓰지 않습니다.</li>
+  </ul>
+
+  <h2>7. 이메일 문의</h2>
+  <p>
+    이메일로 문의하면 답변을 위해 이메일 주소와 문의 내용을 받은 메일함에 보관합니다.
+    삭제를 요청하면 지웁니다.
+  </p>
+
+  <h2>8. 제3자 제공</h2>
+  <p>개발자는 위에 적은 목적 외에 개인정보를 판매하거나 제3자에게 제공하지 않습니다.</p>
+
+  <h2>9. 권리 행사와 문의</h2>
+  <p>
+    개인정보의 확인, 수정, 삭제를 원하거나 이 방침에 대해 궁금한 점이 있으면 아래로 연락해 주세요.
+    결제 정보는 Creem이 보관하므로 필요한 경우 Creem에 함께 요청해 드립니다.
+  </p>
+  <p>CodeGear · <a href="mailto:dukeom@gmail.com">dukeom@gmail.com</a></p>
+
+  <h2>10. 변경</h2>
+  <p>이 방침을 바꾸면 이 페이지에 게시하고 시행일을 갱신합니다.</p>
+</article>
+
+<article id="en" lang="en">
+  <h1>Privacy Policy</h1>
+  <p class="updated">Effective: September 15, 2026</p>
+
+  <p>
+    This policy explains what information <strong>Mac Commander</strong> (the "App"), a macOS application
+    distributed by CodeGear (the "Developer"), and its landing page (the "Website") send, where they send it,
+    and how it is handled.
+  </p>
+
+  <h2>1. Summary</h2>
+  <ul>
+    <li>The App has no accounts, usage analytics, advertising, or tracking.</li>
+    <li>The App works with the files you open only on your Mac and never sends file contents to the Developer or anyone else.</li>
+    <li>The App communicates over the network only in the cases described in sections 2–4.</li>
+  </ul>
+
+  <h2>2. Automatic updates</h2>
+  <p>
+    The App uses the Sparkle framework to check for a new version once a day. It connects to GitHub
+    (the distribution repository), which receives standard request information such as your IP address and
+    the app name and version. No other identifying information is included.
+  </p>
+
+  <h2>3. Supporter keys (optional)</h2>
+  <p>Supporter keys are optional. The following is sent only if you enter a key.</p>
+  <ul>
+    <li><strong>What is sent</strong>: the supporter key, your Mac's name (the computer name in System Settings), and the device registration ID issued at activation</li>
+    <li><strong>Why</strong>: to validate the key and to activate or deactivate it per device (up to five Macs per key)</li>
+    <li><strong>How</strong>: requests pass through a validation server the Developer runs on Cloudflare Workers and are forwarded to the payment provider Creem. The validation server does not store request contents.</li>
+    <li><strong>Stored on your Mac</strong>: the key in the macOS Keychain; the device registration ID, last validation time, and purchase email in the App's preferences. Deactivating the key in the App removes them.</li>
+  </ul>
+
+  <h2>4. Document viewer</h2>
+  <p>
+    If a Markdown or HTML document you open references external images or resources, the viewer loads them
+    from those addresses, as a web browser would. These requests go to the servers named in the document;
+    the Developer is not involved.
+  </p>
+
+  <h2>5. Payments</h2>
+  <p>
+    Supporter key payments are processed by <strong>Creem</strong>, acting as Merchant of Record. Creem collects
+    payment information such as your name, email, payment method, and billing address under the
+    <a href="https://www.creem.io/privacy">Creem Privacy Policy</a>. The Developer never receives card details
+    and sees only the order information (email and order history) needed to issue keys and provide support.
+  </p>
+
+  <h2>6. Website</h2>
+  <ul>
+    <li>The Website is hosted on GitHub Pages, and GitHub may process access logs (such as IP addresses).</li>
+    <li>The Website loads fonts from Google Fonts and a sponsor card from GitHub, and queries the GitHub API for download counts. These services may receive your IP address.</li>
+    <li>The Developer does not use cookies, visitor analytics, or advertising scripts on the Website.</li>
+  </ul>
+
+  <h2>7. Email support</h2>
+  <p>
+    If you contact us by email, we keep your email address and message in our inbox to reply to you.
+    We delete them on request.
+  </p>
+
+  <h2>8. Sharing with third parties</h2>
+  <p>The Developer does not sell personal information or share it with third parties beyond the purposes above.</p>
+
+  <h2>9. Your rights and contact</h2>
+  <p>
+    To access, correct, or delete your personal information, or for any questions about this policy, contact us below.
+    Payment records are held by Creem; where needed, we will pass your request on to Creem.
+  </p>
+  <p>CodeGear · <a href="mailto:dukeom@gmail.com">dukeom@gmail.com</a></p>
+
+  <h2>10. Changes</h2>
+  <p>If we change this policy, we will post the update on this page and revise the effective date.</p>
+</article>
+
+</main>
+
+<footer>
+  <a href="./">Mac Commander</a> ·
+  <a href="https://github.com/codegeargit/mac-commander-releases/blob/main/EULA.md">사용 조건 / Terms of Use</a> ·
+  <a href="mailto:dukeom@gmail.com">dukeom@gmail.com</a>
+</footer>
+
+</body>
+</html>

@@ -45,7 +45,7 @@ fi
 # HTTPS는 gh 자격증명이 다른 계정으로 잡힐 수 있어 SSH로 붙는다(코드 리포 origin과 동일).
 git clone --depth 1 "git@github.com:$RELEASE_REPO.git" "$WORK/repo" 2>/dev/null
 mkdir -p "$WORK/repo/docs"
-cp "$WORK/site/index.html" "$WORK/site/icon.png" "$WORK/repo/docs/"
+cp "$WORK/site/index.html" "$WORK/site/privacy.html" "$WORK/site/icon.png" "$WORK/repo/docs/"
 
 cd "$WORK/repo"
 git add docs   # 새 파일은 add 전에는 diff에 안 잡히므로 먼저 스테이징한다

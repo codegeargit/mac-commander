@@ -250,6 +250,15 @@ a:hover{text-decoration:underline}
    GitHub 안내 크기는 600×225지만 넓은 화면에선 소개글이 두세 줄이라 아래가 비어 높이를 줄인다.
    좁은 화면에선 글이 여러 줄로 접히므로 원래 높이로 되돌린다. */
 .sup .card-embed{display:block;width:100%;max-width:600px;height:150px;border:1px solid var(--divider);background:var(--viewer)}
+/* 후원자 키: 판매하는 것이 무엇이고 얼마인지 한눈에 보이게 한다(결제 대행사 심사 요건이기도 하다). */
+.skey{margin-top:24px;padding-top:20px;border-top:1px solid var(--divider)}
+.skey h3{margin:0;font-size:17px;font-weight:600;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+.skey .price{color:var(--amber);font-variant-numeric:tabular-nums}
+.skey .once{font-size:12px;font-weight:400;color:var(--muted)}
+.skey .facts{margin:12px 0 0;padding:0;list-style:none;font-size:12.5px;color:#A9BFD6}
+.skey .facts li{padding:3px 0 3px 18px;position:relative}
+.skey .facts li::before{content:'›';position:absolute;left:2px;color:var(--accent)}
+.skey .note{margin:12px 0 0;font-size:12px;color:var(--muted)}
 
 footer{
   max-width:1120px;margin:0 auto;padding:6px 16px 30px;
@@ -559,6 +568,16 @@ footer .sp{margin-left:auto}
         <iframe class="card-embed" src="https://github.com/sponsors/codegeargit/card"
                 title="GitHub Sponsors로 codegeargit 후원하기" loading="lazy"></iframe>
       </div>
+      <div class="skey" id="supporter-key">
+        <h3>후원자 키 <span class="price">USD 15</span><span class="once">일회성 결제 · 부가세 별도</span></h3>
+        <ul class="facts">
+          <li>후원 감사 혜택으로 후원자 테마 8종(Nord, Dracula, Gruvbox, Catppuccin 등)과 후원자 배지를 엽니다</li>
+          <li>기능 잠금 없음 — 키가 없어도 모든 기능을 그대로 씁니다</li>
+          <li>만료 없음 · 키 하나로 Mac 최대 5대</li>
+          <li>결제는 판매 대행사 Creem이 처리합니다 · <a href="https://github.com/codegeargit/mac-commander-releases/blob/main/EULA.md">사용 조건</a> · <a href="privacy.html">개인정보처리방침</a></li>
+        </ul>
+        <p class="note">결제 페이지는 준비 중입니다. 열리면 이 자리에 결제 버튼이 생깁니다.</p>
+      </div>
     </div>
   </section>
 
@@ -572,6 +591,8 @@ footer .sp{margin-left:auto}
   <a href="https://github.com/codegeargit/mac-commander-releases">배포 저장소</a>
   <span>·</span>
   <a href="https://github.com/codegeargit/mac-commander-releases/blob/main/EULA.md">사용 조건</a>
+  <span>·</span>
+  <a href="privacy.html">개인정보처리방침</a>
   <span>·</span>
   <a href="mailto:dukeom@gmail.com">문의 dukeom@gmail.com</a>
   <span class="sp">Mac Commander 1.8 (9)</span>
