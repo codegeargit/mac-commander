@@ -1,5 +1,5 @@
 # 리포 상단 Sponsor 버튼에 표시되는 후원 창구.
 github: codegeargit
 buy_me_a_coffee: codegear
-# Creem 후원자 키 라이브 체크아웃 주소가 생기면 추가한다.
-# custom: ["https://www.creem.io/payment/<라이브 상품 ID>"]
+# Creem 후원자 키(라이브 체크아웃).
+custom: ["https://www.creem.io/payment/prod_4Z71U0yqagFSrY9cS0zv3I"]
