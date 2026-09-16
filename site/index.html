@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mac Commander — macOS 마크다운 파일 매니저</title>
-<meta name="description" content="Total Commander의 키보드 중심 파일 관리에 마크다운 뷰어를 붙인 macOS 앱. 트리에서 고르고, 옆 패널에서 바로 읽는다.">
+<title>Mac Commander — Finder와 뷰어를 한 창에 합친 macOS 파일 매니저</title>
+<meta name="description" content="파일 트리와 문서 뷰어를 한 창에 합친 macOS 앱. 트리에서 고르면 옆 패널에서 마크다운·PDF·이미지·Office 문서를 바로 읽고, 두 트리 사이로 복사·이동합니다.">
 <link rel="icon" href="icon.png">
 <meta property="og:title" content="Mac Commander">
-<meta property="og:description" content="마크다운을 파일처럼 다루는 macOS 앱.">
+<meta property="og:description" content="Finder와 문서 뷰어를 한 창에 합친 macOS 파일 매니저.">
 <meta property="og:image" content="icon.png">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -341,16 +341,17 @@ footer .sp{margin-left:auto}
           <li style="--i:7"><span class="guide">  </span><span class="file">README.md</span></li>
           <li style="--i:8"><span class="guide">  </span><span class="file">회의록-0729.md</span></li>
         </ul>
-        <div class="status"><span class="on">마크다운만</span><span>·</span><span>정렬: 폴더 먼저</span></div>
+        <div class="status"><span class="on">MD</span><span>·</span><span>정렬: 이름순</span></div>
       </div>
 
       <div class="doc">
         <h1>Mac&nbsp;Commander<span class="cursor"></span></h1>
         <div class="rule"></div>
-        <p class="lede">마크다운을 <em>파일처럼</em> 다루는 macOS 앱.
-          왼쪽 트리에서 고르고, 오른쪽 패널에서 그대로 읽는다.</p>
-        <p class="sub">Total Commander의 키보드 중심 파일 관리를 macOS 네이티브로 옮겼습니다.
-          문서 폴더를 통째로 열어두고 파일을 옮기고 이름을 바꾸면서, 같은 창에서 읽고 고칩니다.</p>
+        <p class="lede"><em>Finder</em>와 <em>문서 뷰어</em>를 한 창에 합친 macOS 앱.
+          왼쪽 트리에서 고르면, 오른쪽 패널에서 바로 읽는다.</p>
+        <p class="sub">파일을 옮기고 이름을 바꾸는 파일 관리자와, 마크다운·PDF·이미지·Office 문서를 여는 뷰어가
+          한 창에 있습니다. 파일마다 다른 앱을 띄울 필요 없이 같은 창에서 고르고, 읽고, 고칩니다.
+          조작은 Total Commander처럼 키보드 중심입니다.</p>
         <div class="cta">
           <a class="btn" href="https://github.com/codegeargit/mac-commander-releases/releases/download/v1.8/MacCommander-1.8.dmg">
             1.8 다운로드 (.dmg) <span class="kbd">F5</span>
@@ -372,22 +373,25 @@ footer .sp{margin-left:auto}
 
   <!-- ── 기능 ─────────────────────────────────────── -->
   <section class="panel" id="features">
-    <div class="bar"><b>~/기능</b><span>— 파일 매니저가 하는 일</span><span class="count">13개 항목</span></div>
+    <div class="bar"><b>~/기능</b><span>— 파일 매니저가 하는 일</span><span class="count">16개 항목</span></div>
     <div class="listing" style="padding-top:12px">
       <div class="head"><span>이름</span><span>단축키</span><span>설명</span></div>
-      <div class="row"><span class="nm">폴더 열기</span><span class="ky">⌘O</span><span class="ds">폴더를 창에 떨어뜨려도 열립니다. 다음 실행 때 그대로 복원됩니다.</span></div>
-      <div class="row"><span class="nm">마크다운만 보기</span><span class="ky">헤더 토글</span><span class="ds">.md·.markdown·.mdown·.mkd만 남기거나, 전체 파일을 봅니다.</span></div>
+      <div class="row"><span class="nm">폴더 열기</span><span class="ky">⌘O</span><span class="ds">폴더를 창에 떨어뜨려도 열립니다. 시작 화면에 최근 폴더가 남습니다.</span></div>
+      <div class="row"><span class="nm">MD / ALL 보기</span><span class="ky">헤더 토글</span><span class="ds">MD는 뷰어로 열 수 있는 파일(마크다운·PDF·이미지·HTML·Office)만, ALL은 모든 파일을 보여줍니다. 이름·수정일·크기로 정렬합니다.</span></div>
+      <div class="row"><span class="nm">빠른 열기</span><span class="ky">⌘P</span><span class="ds">파일 이름 일부만 쳐서 폴더 안의 파일을 바로 엽니다.</span></div>
+      <div class="row"><span class="nm">본문 찾기</span><span class="ky">⇧⌘F · ⌘F</span><span class="ds">폴더 안 텍스트 파일의 내용을 줄 단위로 찾고, 고르면 그 문서에서 같은 말을 이어 찾습니다.</span></div>
       <div class="row"><span class="nm">새 파일 / 새 폴더</span><span class="ky">⌘N · ⇧⌘N</span><span class="ds">만들자마자 트리에서 이름을 바로 입력합니다.</span></div>
-      <div class="row"><span class="nm">멀티 리네임</span><span class="ky">⌘R</span><span class="ds">여러 파일 이름을 규칙으로 한 번에 바꿉니다. 바꾸기 전 결과를 미리 봅니다.</span></div>
-      <div class="row"><span class="nm">듀얼 트리</span><span class="ky">⇧⌘D · F5 · F6</span><span class="ds">트리를 하나 더 열어 한쪽에서 고른 항목을 반대편에서 고른 폴더로 복사·이동합니다. 아래 F키 바로도 누르고, ⌥⌘→로 같은 위치를 엽니다.</span></div>
+      <div class="row"><span class="nm">멀티 리네임</span><span class="ky">⌘R</span><span class="ds">찾아 바꾸기(정규식)·접두사·연번으로 여러 파일 이름을 한 번에 바꿉니다. 바꾸기 전 결과를 미리 봅니다.</span></div>
+      <div class="row"><span class="nm">듀얼 트리</span><span class="ky">⇧⌘D · F5 · F6</span><span class="ds">트리를 하나 더 열면 아래에 F키 바가 나타납니다. 한쪽에서 고른 항목을 반대편 폴더로 복사(F5)·이동(F6)하고, ⌥⌘→로 같은 위치를 열고, ⌃U로 좌우를 바꿉니다.</span></div>
       <div class="row"><span class="nm">키보드 포커스</span><span class="ky">⇥ · ⇧⇥</span><span class="ds">트리 → 두 번째 트리 → 뷰어를 오갑니다. 화살표 키는 포커스가 있는 곳에서 트리를 움직이거나 문서를 스크롤합니다.</span></div>
-      <div class="row"><span class="nm">이동 · 복사</span><span class="ky">드래그 · ⌥드래그</span><span class="ds">트리 안에서 끌어 옮기고, Option을 누른 채 끌면 복사합니다.</span></div>
+      <div class="row"><span class="nm">이동 · 복사</span><span class="ky">드래그 · ⌥드래그</span><span class="ds">끌어서 옮기고, Option을 누른 채 끌면 복사합니다. 두 트리 사이에서도 됩니다.</span></div>
       <div class="row"><span class="nm">휴지통으로 삭제</span><span class="ky">⌘⌫ · F8</span><span class="ds">지우지 않고 휴지통으로 보냅니다. 되돌릴 수 있습니다.</span></div>
       <div class="row"><span class="nm">폴더로 이동</span><span class="ky">⇧⌘G</span><span class="ds">경로를 직접 입력해 그 폴더를 새 루트로 엽니다.</span></div>
-      <div class="row"><span class="nm">뷰어 패널 분할</span><span class="ky">⌃⌘+ · ⌃⌘-</span><span class="ds">문서를 최대 3개까지 나란히 놓고 비교합니다.</span></div>
-      <div class="row"><span class="nm">편집과 저장</span><span class="ky">⌘E · ⌘S</span><span class="ds">읽던 문서를 그 자리에서 고칩니다. 저장 안 된 문서는 표시가 붙습니다.</span></div>
-      <div class="row"><span class="nm">터미널 패널</span><span class="ky">⌃`</span><span class="ds">지금 보고 있는 폴더에서 셸이 열립니다.</span></div>
-      <div class="row"><span class="nm">세션 복원</span><span class="ky">자동</span><span class="ds">창 크기, 패널 폭, 펼친 폴더, 열어둔 문서를 그대로 되살립니다.</span></div>
+      <div class="row"><span class="nm">뷰어 패널 분할</span><span class="ky">⌃⌘+ · ⌃⌘-</span><span class="ds">문서를 최대 3개까지 나란히 놓고 비교합니다. ⌘클릭하면 새 패널에 엽니다.</span></div>
+      <div class="row"><span class="nm">편집과 저장</span><span class="ky">⌘E · ⌘S</span><span class="ds">마크다운과 텍스트를 그 자리에서 고칩니다. 저장 안 된 문서는 표시가 붙습니다.</span></div>
+      <div class="row"><span class="nm">터미널 패널</span><span class="ky">⌃`</span><span class="ds">트리에서 고른 폴더에서 셸이 열립니다. 창 오른쪽이나 아래에 붙입니다.</span></div>
+      <div class="row"><span class="nm">자동 새로고침</span><span class="ky">자동</span><span class="ds">다른 앱에서 파일을 바꾸면 트리와 열린 문서가 알아서 갱신됩니다.</span></div>
+      <div class="row"><span class="nm">세션 복원</span><span class="ky">자동</span><span class="ds">열어둔 폴더와 문서, 두 번째 트리, 패널 폭, 터미널 위치를 다음 실행 때 되살립니다.</span></div>
     </div>
   </section>
 
@@ -447,12 +451,20 @@ footer .sp{margin-left:auto}
         <span class="chip hi">.md</span><span class="chip hi">.markdown</span><span class="chip hi">.mdown</span>
         <span class="chip hi">.mkd</span><span class="chip">.pdf</span><span class="chip">.html</span>
         <span class="chip">.htm</span><span class="chip">.png</span><span class="chip">.jpg</span>
-        <span class="chip">.gif</span><span class="chip">.svg</span><span class="chip">.webp</span>
-        <span class="chip">.heic</span><span class="chip">.tiff</span><span class="chip">.icns</span>
+        <span class="chip">.jpeg</span><span class="chip">.gif</span><span class="chip">.svg</span>
+        <span class="chip">.webp</span><span class="chip">.heic</span><span class="chip">.heif</span>
+        <span class="chip">.tiff</span><span class="chip">.tif</span><span class="chip">.bmp</span>
+        <span class="chip">.ico</span><span class="chip">.icns</span>
+        <span class="chip">.docx</span><span class="chip">.doc</span><span class="chip">.rtf</span>
+        <span class="chip">.xlsx</span><span class="chip">.xls</span><span class="chip">.pptx</span>
+        <span class="chip">.ppt</span><span class="chip">.pages</span><span class="chip">.numbers</span>
+        <span class="chip">.key</span>
       </div>
       <p style="font-size:12.5px;color:#A9BFD6;margin:14px 0 0">
-        PDF는 확대·폭 맞춤이 되는 전용 뷰어로, 이미지는 원본 비율 그대로, HTML은 웹뷰로 엽니다.
-        마크다운 안에 넣은 상대 경로 이미지도 그대로 보입니다.
+        긴 마크다운 문서에는 오른쪽에 목차가 붙고, ⌘F로 문서 안을 찾습니다. 마크다운 안에 넣은 상대 경로 이미지도 그대로 보입니다.
+        PDF는 쪽 표시와 확대가 되는 전용 뷰어로, 이미지는 원본 비율 그대로, HTML은 웹뷰로,
+        Word·Excel·PowerPoint·Pages·Numbers·Keynote 문서는 macOS 훑어보기(Quick Look)로 엽니다(읽기 전용).
+        그 밖의 파일은 ALL 보기에서 텍스트로 엽니다. 트랙패드 핀치로 확대할 수 있습니다.
       </p>
     </div>
   </section>
@@ -470,8 +482,8 @@ footer .sp{margin-left:auto}
 <span class="p">$</span> claude<span class="caret"></span></div>
         </div>
         <div class="prose">
-          <p><span class="k">⌃`</span> 를 누르면 창 아래쪽에서 터미널이 올라옵니다. 지금 트리에서 보고 있는
-            폴더가 곧 작업 디렉터리라서, <strong>cd 할 일이 없습니다.</strong></p>
+          <p><span class="k">⌃`</span> 를 누르면 창 오른쪽에 터미널이 열립니다(아래로 옮길 수도 있습니다).
+            트리에서 고른 폴더가 곧 작업 디렉터리라서, <strong>cd 할 일이 없습니다.</strong></p>
           <p>버튼 하나로 그 폴더에서 <strong>Claude Code</strong>를 띄울 수 있습니다.
             문서를 읽다가, 고치다가, 바로 옆에서 명령을 실행하는 흐름이 한 창 안에서 끝납니다.</p>
         </div>
@@ -490,32 +502,36 @@ footer .sp{margin-left:auto}
             <div class="kr"><dt>⌘N · ⇧⌘N</dt><dd>새 파일 · 새 폴더</dd></div>
             <div class="kr"><dt>⌘R</dt><dd>멀티 리네임</dd></div>
             <div class="kr"><dt>⌘⌫</dt><dd>휴지통으로 삭제</dd></div>
-            <div class="kr"><dt>⌘O</dt><dd>폴더 열기</dd></div>
-            <div class="kr"><dt>⌘T</dt><dd>터미널에서 열기</dd></div>
+            <div class="kr"><dt>⌘O · ⌘P</dt><dd>폴더 열기 · 빠른 열기</dd></div>
+            <div class="kr"><dt>⌘T</dt><dd>Terminal 앱에서 열기</dd></div>
             <div class="kr"><dt>⌘↑ · ⇧⌘G</dt><dd>상위 폴더 · 경로로 이동</dd></div>
-            <div class="kr"><dt>⇧⌘D · ⌥⌘→←</dt><dd>두 번째 트리 · 같은 위치 열기</dd></div>
+            <div class="kr"><dt>⇧⌘F</dt><dd>폴더에서 본문 찾기</dd></div>
           </dl>
         </section>
         <section>
-          <h3>뷰어</h3>
+          <h3>뷰어 · 화면</h3>
           <dl>
             <div class="kr"><dt>⌘E · ⌘S</dt><dd>편집 전환 · 저장</dd></div>
-            <div class="kr"><dt>⌘+ · ⌘-</dt><dd>글자 크게 · 작게</dd></div>
-            <div class="kr"><dt>⌘0</dt><dd>기본 크기로</dd></div>
-            <div class="kr"><dt>⌘ + 휠</dt><dd>확대 · 축소</dd></div>
+            <div class="kr"><dt>⌘F · ⌘G</dt><dd>문서 안 찾기 · 다음</dd></div>
+            <div class="kr"><dt>⌘+ · ⌘- · ⌘0</dt><dd>글자 크게 · 작게 · 기본</dd></div>
+            <div class="kr"><dt>⌘휠 · 핀치</dt><dd>확대 · 축소</dd></div>
             <div class="kr"><dt>⇥ · ⇧⇥</dt><dd>트리 → 두 번째 트리 → 뷰어</dd></div>
             <div class="kr"><dt>⌃⌘+ · ⌃⌘-</dt><dd>패널 추가 · 제거</dd></div>
+            <div class="kr"><dt>⌃`</dt><dd>터미널 열기 · 닫기</dd></div>
+            <div class="kr"><dt>⌘/</dt><dd>단축키 전체 보기</dd></div>
           </dl>
         </section>
         <section>
-          <h3>펑션 키</h3>
+          <h3>듀얼 트리 · 펑션 키</h3>
           <dl>
+            <div class="kr"><dt>⇧⌘D · ⌃U</dt><dd>두 번째 트리 · 좌우 바꾸기</dd></div>
+            <div class="kr"><dt>⌥⌘→ · ⌥⌘←</dt><dd>반대편에 같은 위치 열기</dd></div>
             <div class="kr"><dt>F3 · F4</dt><dd>보기 · 편집</dd></div>
-            <div class="kr"><dt>F5 · F6</dt><dd>복사 · 이름변경(듀얼: 이동)</dd></div>
-            <div class="kr"><dt>F7 · F8</dt><dd>새폴더 · 삭제</dd></div>
-            <div class="kr"><dt>Space</dt><dd>선택 토글</dd></div>
-            <div class="kr"><dt>⌘ · ⇧ 클릭</dt><dd>새 패널 · 범위 선택</dd></div>
-            <div class="kr"><dt>⌃`</dt><dd>터미널 열기 · 닫기</dd></div>
+            <div class="kr"><dt>F5 · F6</dt><dd>반대편으로 복사 · 이동</dd></div>
+            <div class="kr"><dt>⇧F6</dt><dd>이름 바꾸기</dd></div>
+            <div class="kr"><dt>F7 · F8</dt><dd>새 폴더 · 삭제</dd></div>
+            <div class="kr"><dt>Space · Insert</dt><dd>선택 토글 · 토글하고 아래로</dd></div>
+            <div class="kr"><dt>⌘ · ⌥ · ⇧ 클릭</dt><dd>새 패널 · 선택 토글 · 범위 선택</dd></div>
           </dl>
         </section>
       </div>
@@ -574,7 +590,8 @@ footer .sp{margin-left:auto}
           <li>후원 감사 혜택으로 후원자 테마 8종(Nord, Dracula, Gruvbox, Catppuccin 등)과 후원자 배지를 엽니다</li>
           <li>기능 잠금 없음 — 키가 없어도 모든 기능을 그대로 씁니다</li>
           <li>만료 없음 · 키 하나로 Mac 최대 5대</li>
-          <li>결제는 판매 대행사 Creem이 처리합니다 · <a href="https://github.com/codegeargit/mac-commander-releases/blob/main/EULA.md">사용 조건</a> · <a href="privacy.html">개인정보처리방침</a></li>
+          <li>14일 이내 사유 불문 전액 환불 · <a href="terms.html#ko">환불 정책</a></li>
+          <li>결제는 판매 대행사 Creem이 처리합니다 · <a href="terms.html">사용 조건</a> · <a href="privacy.html">개인정보처리방침</a></li>
         </ul>
         <div class="cta" style="margin:16px 0 0">
           <a class="btn" href="https://www.creem.io/payment/prod_4Z71U0yqagFSrY9cS0zv3I">후원자 키 받기 (USD 15)</a>
@@ -593,11 +610,11 @@ footer .sp{margin-left:auto}
   <span>·</span>
   <a href="https://github.com/codegeargit/mac-commander-releases">배포 저장소</a>
   <span>·</span>
-  <a href="https://github.com/codegeargit/mac-commander-releases/blob/main/EULA.md">사용 조건</a>
+  <a href="terms.html">사용 조건</a>
   <span>·</span>
   <a href="privacy.html">개인정보처리방침</a>
   <span>·</span>
-  <a href="mailto:dukeom@gmail.com">문의 dukeom@gmail.com</a>
+  <a href="mailto:support@maccommander.com">문의 support@maccommander.com</a>
   <span class="sp">Mac Commander 1.8 (9)</span>
 </footer>
 

@@ -4,7 +4,7 @@ macOS용 마크다운 파일 탐색 · 편집 앱. SwiftUI로 작성한 네이�
 
 *A native macOS app for browsing and editing Markdown files — with math, diagrams, a built-in terminal, and multi-panel viewers. Open source under GPLv3.*
 
-**➡️ [최신 버전 다운로드](https://github.com/codegeargit/mac-commander-releases/releases/latest)** · [소개 페이지](https://codegeargit.github.io/mac-commander-releases/)
+**➡️ [최신 버전 다운로드](https://github.com/codegeargit/mac-commander-releases/releases/latest)** · [소개 페이지](https://maccommander.com/)
 
 ## 주요 기능
 
