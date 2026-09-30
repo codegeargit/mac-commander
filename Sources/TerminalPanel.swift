@@ -55,6 +55,30 @@ final class CommanderTerminalView: LocalProcessTerminalView {
         return true
     }
 
+    /// IME가 확정한 글자(한글 음절 등)를 kitty keyboard protocol 상태에서도 그대로 보낸다.
+    ///
+    /// 한글 IME는 다음 자모 키를 누를 때 앞 음절을 확정한다("질" 다음 ㅁ → insertText("질")).
+    /// SwiftTerm은 이 확정 글자를 방금 누른 키(ㅁ)의 이벤트로 인코딩하는데, claude처럼
+    /// 대체 키 보고(`CSI > 5 u`)를 켠 앱에는 기본 배열 키(m)가 달라 CSI u로 가면서
+    /// 텍스트는 빠지고 키 코드 ㅁ만 전달된다 — 음절 대신 자모가 입력되는 원인.
+    /// kitty 스펙상 IME가 만든 글자는 평문 UTF-8로 보내는 게 맞으므로, 키 하나가 만든
+    /// ASCII 글자가 아니면 SwiftTerm을 거치지 않고 직접 보낸다.
+    /// (붙여넣기는 SwiftTerm 내부 경로로 가서 여기를 지나지 않는다.)
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        let text = (string as? String) ?? (string as? NSAttributedString)?.string
+            ?? (string as? NSString).map { $0 as String }
+        guard let text, terminal != nil, !terminal.keyboardEnhancementFlags.isEmpty,
+              text.unicodeScalars.count > 1 || text.unicodeScalars.contains(where: { !$0.isASCII })
+        else {
+            super.insertText(string, replacementRange: replacementRange)
+            return
+        }
+        // SwiftTerm의 조합 중 플래그를 내린다. 안 내리면 이후 Enter 같은 키가 조합 중으로
+        // 간주돼 인코더에서 버려진다.
+        unmarkText()
+        send(Array(text.utf8))
+    }
+
     /// 모니터는 앱 전체 키 입력을 보므로, 실제로 이 터미널이
     /// 키 입력을 받는 상태일 때만 가로채도록 확인한다.
     private var hasKeyboardFocus: Bool {
