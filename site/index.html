@@ -285,6 +285,119 @@ footer .sp{margin-left:auto}
 .fbar a:hover,.fbar a[aria-current="true"]{background:var(--select-bg);color:var(--select-fg);text-decoration:none}
 .fbar a:hover .n,.fbar a[aria-current="true"] .n{color:var(--select-fg)}
 
+/* ── 화면 배치: 앱 창을 그림으로 ──────────────────────
+   스크린샷 대신 HTML로 그린 창이다. 960×560 설계 크기로 짜 두고 폭에 맞춰 통째로
+   축소한다(--s, 스크립트가 채움). 배치 전환은 grid 트랙과 flex-grow를 애니메이션한다.
+   앱 구조와 같게: [트리 | 두 번째 트리 | 뷰어 1~3개], 터미널은 뷰어 영역 오른쪽이나 아래. */
+.lx-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.lx-tab{
+  font:inherit;font-size:12px;padding:6px 11px;cursor:pointer;
+  border:1px solid var(--divider);background:#08111F;color:#A9BFD6;
+  display:inline-flex;gap:8px;align-items:baseline;
+}
+.lx-tab .k{color:var(--amber);font-size:11px}
+.lx-tab:hover{border-color:var(--accent-dim);color:var(--text)}
+.lx-tab[aria-selected="true"]{background:var(--select-bg);border-color:var(--select-bg);color:var(--select-fg)}
+.lx-tab[aria-selected="true"] .k{color:var(--select-fg)}
+.lx-stage{position:relative;width:100%;aspect-ratio:960/560;overflow:hidden}
+.lx-win{
+  position:absolute;left:0;top:0;width:960px;height:560px;
+  transform-origin:0 0;transform:scale(var(--s,1));
+  display:flex;flex-direction:column;
+  border:1px solid #24405F;border-radius:8px;overflow:hidden;
+  background:var(--viewer);font-size:12px;line-height:1.5;
+}
+.lx-cap{margin:12px 0 0;font-size:13px;color:#A9BFD6;min-height:3.2em;max-width:70ch}
+.lx-cap b{color:var(--text);font-weight:600}
+
+.lx-title{
+  flex:none;height:30px;display:flex;align-items:center;gap:7px;padding:0 12px;
+  background:#0E2440;border-bottom:1px solid var(--divider);color:var(--muted);font-size:11.5px;
+}
+.lx-title i{width:11px;height:11px;border-radius:50%;background:#2B3A4E;display:inline-block}
+.lx-title span{margin-left:10px}
+.lx-body{
+  flex:1;min-height:0;display:grid;grid-template-columns:25% 0% 1fr;
+  transition:grid-template-columns .55s cubic-bezier(.2,.7,.3,1);
+}
+.lx-win[data-layout="dual"] .lx-body{grid-template-columns:21% 21% 1fr}
+
+.lx-tree{position:relative;min-width:0;overflow:hidden;background:var(--navy)}
+/* 구분선은 자식(헤더) 배경 위로 그려야 끊기지 않는다. 폭이 0인 트리에선 overflow로 잘려 안 보인다. */
+.lx-tree::after,.lx-vp+.lx-vp::before,.lx-term::before{content:'';position:absolute;z-index:1;background:var(--divider)}
+.lx-tree::after{right:0;top:0;bottom:0;width:1px}
+.lx-th{
+  height:28px;display:flex;align-items:center;gap:6px;padding:0 10px;white-space:nowrap;
+  background:var(--header);border-bottom:1px solid var(--divider);font-size:11px;color:var(--text);
+}
+.lx-th .m{margin-left:auto;font-size:10px;padding:0 4px;background:var(--accent-dim);color:var(--text)}
+.lx-tree ul{list-style:none;margin:6px 0 0;padding:0}
+.lx-tree li{height:21px;line-height:21px;padding:0 10px;white-space:nowrap;font-size:11.5px;color:var(--text)}
+.lx-tree .g{color:var(--accent-dim);white-space:pre}
+.lx-tree .d{color:var(--folder)}
+.lx-tree li.sel{background:var(--select-bg);color:var(--select-fg)}
+.lx-tree li.sel .g{color:var(--select-fg)}
+.lx-tree li.cur{background:rgba(51,204,255,.08);box-shadow:inset 0 0 0 1px var(--accent-dim)}
+
+.lx-work{
+  min-width:0;min-height:0;display:grid;
+  grid-template-columns:1fr 0%;grid-template-rows:1fr 0%;
+  transition:grid-template-columns .55s cubic-bezier(.2,.7,.3,1),grid-template-rows .55s cubic-bezier(.2,.7,.3,1);
+}
+.lx-win[data-layout="term"] .lx-work{grid-template-columns:1fr 38%}
+.lx-win[data-layout="termb"] .lx-work{grid-template-rows:1fr 36%}
+.lx-views{grid-area:1/1;display:flex;min-width:0;min-height:0}
+.lx-vp{
+  flex:1 1 0;min-width:0;overflow:hidden;display:flex;flex-direction:column;
+  position:relative;
+  transition:flex-grow .55s cubic-bezier(.2,.7,.3,1),opacity .4s ease;
+}
+.lx-vp+.lx-vp::before{left:0;top:0;bottom:0;width:1px}
+.lx-vp.p2,.lx-vp.p3{flex-grow:0;opacity:0}
+.lx-win[data-layout="v2"] .p2,.lx-win[data-layout="v3"] .p2,.lx-win[data-layout="v3"] .p3{flex-grow:1;opacity:1}
+.lx-vh{
+  flex:none;height:28px;display:flex;align-items:center;padding:0 12px;white-space:nowrap;
+  background:#0F1A28;border-bottom:1px solid var(--divider);font-size:11px;color:#9FC4E8;
+}
+/* 뷰어가 여럿일 때만 활성 패널 표시(앱과 같은 규칙) */
+.lx-win[data-layout="v2"] .p2 .lx-vh,.lx-win[data-layout="v3"] .p3 .lx-vh{box-shadow:inset 0 2px var(--accent)}
+.lx-vc{padding:20px 24px;overflow:hidden;min-width:220px}
+.lx-vc h4{margin:0 0 12px;font-size:21px;font-weight:600;white-space:nowrap;color:var(--text)}
+.lx-vc h5{margin:16px 0 9px;font-size:12.5px;font-weight:600;color:var(--accent)}
+.lx-ln{height:6px;border-radius:3px;background:#1E2C3E;margin:0 0 9px}
+.lx-cb{
+  margin-top:14px;padding:9px 11px;white-space:pre;font-size:10.5px;line-height:1.6;
+  background:#0A1220;border:1px solid #16202E;color:#9FC4E8;
+}
+.lx-vc .mdtable{font-size:11px;margin-top:4px}
+
+.lx-term{position:relative;grid-area:1/2;min-width:0;min-height:0;overflow:hidden;background:#080D14}
+.lx-term::before{left:0;top:0;bottom:0;width:1px}
+.lx-win[data-layout="termb"] .lx-term{grid-area:2/1/3/3}
+.lx-win[data-layout="termb"] .lx-term::before{right:0;bottom:auto;width:auto;height:1px}
+.lx-term .tb{
+  height:28px;display:flex;align-items:center;padding:0 12px;white-space:nowrap;
+  background:#101826;border-bottom:1px solid var(--divider);font-size:11px;color:var(--muted);
+}
+.lx-term .tx{padding:10px 13px;white-space:pre;font-size:11.5px;line-height:1.75;color:var(--text)}
+.lx-term .p{color:var(--accent)}
+.lx-term .o{color:var(--muted)}
+.lx-term .caret{display:inline-block;width:7px;height:13px;background:var(--accent);vertical-align:-2px;animation:blink 1.15s steps(1,end) infinite}
+
+.lx-status{
+  flex:none;height:24px;display:flex;align-items:center;gap:10px;padding:0 12px;white-space:nowrap;
+  background:var(--navy);border-top:1px solid var(--divider);font-size:11px;color:var(--muted);
+}
+.lx-status .r{margin-left:auto}
+.lx-fk{
+  flex:none;display:grid;grid-template-columns:repeat(7,1fr);gap:1px;
+  height:0;overflow:hidden;background:var(--divider);
+  transition:height .55s cubic-bezier(.2,.7,.3,1);
+}
+.lx-win[data-layout="dual"] .lx-fk{height:27px;border-top:1px solid var(--divider)}
+.lx-fk span{display:flex;align-items:center;justify-content:center;gap:5px;background:var(--header);font-size:11px;white-space:nowrap}
+.lx-fk b{color:var(--amber);font-weight:600}
+
 /* ── 반응형 ───────────────────────────────────────── */
 @media (max-width:900px){
   .hero{grid-template-columns:1fr}
@@ -368,6 +481,131 @@ footer .sp{margin-left:auto}
           <span id="dlcount" hidden></span>
         </p>
       </div>
+    </div>
+  </section>
+
+  <!-- ── 화면 배치 ───────────────────────────────── -->
+  <section class="panel" id="layouts">
+    <div class="bar"><b>~/화면</b><span>— 한 창을 나눠 쓰는 방법</span><span class="count">배치 6가지</span></div>
+    <div class="pad">
+      <div class="lx-tabs" role="tablist" aria-label="화면 배치">
+        <button class="lx-tab" role="tab" aria-selected="true" data-layout="base"
+          data-cap="<b>트리 하나, 뷰어 하나.</b> 왼쪽 트리에서 파일을 고르면 오른쪽 뷰어에 바로 그려집니다. 가장 기본이 되는 배치입니다.">기본</button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="dual"
+          data-cap="<b>트리 두 개.</b> ⇧⌘D로 두 번째 트리를 엽니다. 맨 아래에 F키 바가 나타나고, F5·F6으로 반대편 폴더에 복사·이동합니다.">트리 2개 <span class="k">⇧⌘D</span></button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="v2"
+          data-cap="<b>뷰어 두 개.</b> ⌃⌘+를 누르거나 트리에서 ⌘클릭하면 뷰어가 하나 더 열립니다. 두 문서를 나란히 놓고 비교합니다.">뷰어 2개 <span class="k">⌃⌘+</span></button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="v3"
+          data-cap="<b>뷰어 세 개.</b> 뷰어는 최대 3개까지 나란히 놓을 수 있습니다. 패널 사이 구분선을 끌어 폭을 나눕니다.">뷰어 3개</button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="term"
+          data-cap="<b>터미널.</b> ⌃`를 누르면 창 오른쪽에 터미널이 열립니다. 트리에서 고른 폴더가 작업 디렉터리라 cd 할 일이 없습니다.">터미널 <span class="k">⌃`</span></button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="termb"
+          data-cap="<b>터미널을 아래로.</b> 문서를 넓게 읽고 싶으면 터미널을 아래에 붙입니다. 위치를 바꿔도 실행 중인 셸은 그대로 이어집니다.">터미널 아래</button>
+      </div>
+
+      <div class="lx-stage" role="tabpanel" aria-label="Mac Commander 창 배치 그림">
+        <div class="lx-win" data-layout="base" aria-hidden="true">
+          <div class="lx-title"><i></i><i></i><i></i><span>Mac Commander</span></div>
+          <div class="lx-body">
+            <div class="lx-tree">
+              <div class="lx-th">~/documents <span class="m">MD</span></div>
+              <ul>
+                <li><span class="g">▾ </span><span class="d">design</span></li>
+                <li><span class="g">│ ├ </span>design-tokens.md</li>
+                <li><span class="g">│ └ </span>visual-style.md</li>
+                <li><span class="g">▾ </span><span class="d">planning</span></li>
+                <li><span class="g">│ ├ </span>컨셉.md</li>
+                <li><span class="g">│ ├ </span>로드맵.md</li>
+                <li><span class="g">│ └ </span>구조.md</li>
+                <li class="sel"><span class="g">  </span>Mac Commander.md</li>
+                <li><span class="g">  </span>README.md</li>
+                <li><span class="g">  </span>회의록-0729.md</li>
+                <li><span class="g">▸ </span><span class="d">assets</span></li>
+              </ul>
+            </div>
+            <div class="lx-tree">
+              <div class="lx-th">~/archive <span class="m">ALL</span></div>
+              <ul>
+                <li class="cur"><span class="g">▾ </span><span class="d">2026</span></li>
+                <li><span class="g">│ ├ </span>회의록-0715.md</li>
+                <li><span class="g">│ ├ </span>회의록-0722.md</li>
+                <li><span class="g">│ └ </span>분기보고.pdf</li>
+                <li><span class="g">▸ </span><span class="d">2025</span></li>
+                <li><span class="g">▸ </span><span class="d">이미지</span></li>
+                <li><span class="g">  </span>notes.txt</li>
+              </ul>
+            </div>
+            <div class="lx-work">
+              <div class="lx-views">
+                <div class="lx-vp p1">
+                  <div class="lx-vh">Mac Commander.md</div>
+                  <div class="lx-vc">
+                    <h4>Mac Commander</h4>
+                    <div class="lx-ln" style="width:92%"></div>
+                    <div class="lx-ln" style="width:84%"></div>
+                    <div class="lx-ln" style="width:61%"></div>
+                    <h5>구성</h5>
+                    <div class="lx-ln" style="width:78%"></div>
+                    <div class="lx-ln" style="width:88%"></div>
+                    <div class="lx-ln" style="width:45%"></div>
+                    <div class="lx-cb">$ open MacCommander.app
+✓ 트리 · 뷰어 · 터미널</div>
+                  </div>
+                </div>
+                <div class="lx-vp p2">
+                  <div class="lx-vh">로드맵.md</div>
+                  <div class="lx-vc">
+                    <h4>로드맵</h4>
+                    <div class="lx-ln" style="width:86%"></div>
+                    <div class="lx-ln" style="width:70%"></div>
+                    <table class="mdtable">
+                      <tr><th>분기</th><th>목표</th></tr>
+                      <tr><td>Q3</td><td>듀얼 트리</td></tr>
+                      <tr><td>Q4</td><td>뷰어 확장</td></tr>
+                    </table>
+                    <h5>메모</h5>
+                    <div class="lx-ln" style="width:80%"></div>
+                    <div class="lx-ln" style="width:52%"></div>
+                  </div>
+                </div>
+                <div class="lx-vp p3">
+                  <div class="lx-vh">구조.md</div>
+                  <div class="lx-vc">
+                    <h4>구조</h4>
+                    <div class="lx-ln" style="width:74%"></div>
+                    <svg width="190" height="110" viewBox="0 0 190 110" style="display:block;margin-top:10px">
+                      <g fill="none" stroke="#2A6FB0">
+                        <rect x="1" y="42" width="52" height="24"/><rect x="70" y="6" width="52" height="24"/>
+                        <rect x="70" y="78" width="52" height="24"/><rect x="138" y="42" width="50" height="24" stroke="#33CCFF"/>
+                      </g>
+                      <g stroke="#33CCFF" fill="none">
+                        <path d="M53 54h8V18h9M53 54h8v36h9M122 18h8v36h8M122 90h8V54h8"/>
+                      </g>
+                      <g font-family="IBM Plex Mono, monospace" font-size="9" fill="#E6F1FF" text-anchor="middle">
+                        <text x="27" y="57">트리</text><text x="96" y="21">뷰어</text>
+                        <text x="96" y="93">터미널</text><text x="163" y="57" fill="#33CCFF">한 창</text>
+                      </g>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div class="lx-term">
+                <div class="tb">documents — zsh</div>
+                <div class="tx"><span class="p">$</span> pwd
+<span class="o">/Users/you/documents</span>
+
+<span class="p">$</span> claude<span class="caret"></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="lx-status"><span>Mac Commander.md</span><span>·</span><span>12 KB</span><span class="r">항목 11개</span></div>
+          <div class="lx-fk">
+            <span><b>F3</b>보기</span><span><b>F4</b>편집</span><span><b>F5</b>복사 →</span><span><b>F6</b>이동 →</span>
+            <span><b>⇧F6</b>이름변경</span><span><b>F7</b>새폴더</span><span><b>F8</b>삭제</span>
+          </div>
+        </div>
+      </div>
+      <p class="lx-cap"><b>트리 하나, 뷰어 하나.</b> 왼쪽 트리에서 파일을 고르면 오른쪽 뷰어에 바로 그려집니다. 가장 기본이 되는 배치입니다.</p>
     </div>
   </section>
 
@@ -690,6 +928,60 @@ footer .sp{margin-left:auto}
   }, { rootMargin: '-45% 0px -50% 0px' });
 
   sections.forEach(function (s) { io.observe(s.el); });
+})();
+
+// 화면 배치 그림: 탭으로 배치를 바꾸고, 사용자가 손대기 전까지는 저절로 넘긴다.
+(function () {
+  var root = document.getElementById('layouts');
+  if (!root) return;
+  var stage = root.querySelector('.lx-stage');
+  var win = root.querySelector('.lx-win');
+  var cap = root.querySelector('.lx-cap');
+  var tabs = Array.prototype.slice.call(root.querySelectorAll('.lx-tab'));
+  var current = 0;
+
+  // 960px 설계 크기의 창을 무대 폭에 맞춰 축소한다.
+  function fit() { win.style.setProperty('--s', stage.clientWidth / 960); }
+  fit();
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(stage);
+  else window.addEventListener('resize', fit);
+
+  function show(i) {
+    current = (i + tabs.length) % tabs.length;
+    tabs.forEach(function (t, k) {
+      t.setAttribute('aria-selected', String(k === current));
+      t.tabIndex = k === current ? 0 : -1;
+    });
+    win.dataset.layout = tabs[current].dataset.layout;
+    cap.innerHTML = tabs[current].dataset.cap;
+  }
+
+  var timer = null;
+  var visible = false;
+  var stopped = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function tick() {
+    clearInterval(timer); timer = null;
+    if (!stopped && visible) timer = setInterval(function () { show(current + 1); }, 3800);
+  }
+  function stop() { stopped = true; tick(); }
+
+  tabs.forEach(function (t, k) {
+    t.addEventListener('click', function () { stop(); show(k); });
+  });
+  root.querySelector('.lx-tabs').addEventListener('keydown', function (e) {
+    var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    stop(); show(current + d); tabs[current].focus();
+  });
+
+  // 화면에 보일 때만 넘긴다. 스크롤해서 도착했을 때 중간 장면부터 보지 않게.
+  if (window.IntersectionObserver) {
+    new IntersectionObserver(function (entries) {
+      visible = entries[0].isIntersecting;
+      tick();
+    }, { threshold: 0.4 }).observe(stage);
+  }
 })();
 </script>
 </body>
