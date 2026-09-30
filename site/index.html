@@ -174,15 +174,7 @@ a:hover{text-decoration:underline}
 .listing .row:hover .nm,.listing .row:hover .ky,.listing .row:hover .ds{color:var(--select-fg)}
 .listing .row:last-child{margin-bottom:12px}
 
-/* ── 뷰어 섹션 카드 ───────────────────────────────── */
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.card{border:1px solid var(--divider);background:var(--viewer);padding:16px}
-.card h3{margin:0 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600}
-.card p{margin:10px 0 0;font-size:12.5px;color:#A9BFD6;line-height:1.6}
-.card .demo{
-  min-height:96px;display:flex;align-items:center;justify-content:center;
-  margin-top:10px;padding:10px;background:#080D14;border:1px solid #16202E;
-}
+/* ── 뷰어 섹션: 수식 표기(파일 종류 그림에서 사용) ── */
 .formula{font-family:var(--serif);font-size:22px;color:var(--text);display:flex;align-items:center;gap:.28em}
 .formula .int{font-size:30px;line-height:.9}
 .formula sup,.formula sub{font-size:.52em}
@@ -398,12 +390,55 @@ footer .sp{margin-left:auto}
 .lx-fk span{display:flex;align-items:center;justify-content:center;gap:5px;background:var(--header);font-size:11px;white-space:nowrap}
 .lx-fk b{color:var(--amber);font-weight:600}
 
+/* 파일 종류 그림: 트리에서 고른 파일(data-f)에 맞는 뷰어 화면 하나만 보인다. */
+.fv{display:none;height:100%;flex-direction:column;min-height:0}
+.fv.on{display:flex;animation:fvin .35s ease}
+@keyframes fvin{from{opacity:0}to{opacity:1}}
+.fv .lx-vh{justify-content:space-between}
+.fv-meta{color:var(--muted);font-size:10.5px}
+.fv-md{flex:1;min-height:0;display:grid;grid-template-columns:1fr 170px}
+.fv-chk{font-size:12px;color:#CFE2F7;margin:0 0 6px}
+.fv-chk span{color:var(--accent);margin-right:6px}
+.fv-quote{margin:12px 0;padding:6px 12px;border-left:3px solid var(--accent-dim);color:#9FC4E8;font-size:12px;font-family:var(--serif);font-style:italic}
+.fv-toc{border-left:1px solid var(--divider);padding:20px 14px;font-size:11px;color:var(--muted);line-height:2}
+.fv-toc .t{color:var(--text);font-weight:600;margin-bottom:4px}
+.fv-toc .on{color:var(--accent)}
+.fv-toc .s{padding-left:12px}
+.fv-center{display:flex;justify-content:center;padding:18px 0 6px}
+.fv-center .formula{font-size:26px}
+.fv-center .formula .int{font-size:36px}
+.fv-pdf{flex:1;min-height:0;background:#161E2A;display:flex;justify-content:center;padding:22px 0 0;overflow:hidden}
+.fv-pdf .pg{width:330px;background:#EEF2F7;padding:30px 32px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.fv-pdf .pt{font-family:var(--serif);font-size:20px;color:#14233A;margin-bottom:14px}
+.fv-pdf .pl{height:5px;border-radius:2px;background:#C3CCD8;margin:0 0 9px}
+.fv-pdf .bars{height:110px;display:flex;align-items:flex-end;gap:14px;margin:16px 0 18px;padding:0 10px;border-bottom:1px solid #C3CCD8}
+.fv-pdf .bars i{flex:1;background:#2A6FB0}
+.fv-img{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:var(--viewer)}
+.fv-img svg{display:block;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.fv-web{flex:1;min-height:0;background:#F5F7FA;color:#1B2635;font-family:-apple-system,system-ui,sans-serif}
+.fv-web .nav{display:flex;gap:18px;align-items:center;padding:12px 20px;background:#fff;border-bottom:1px solid #E1E6EE;font-size:12px;color:#5A6B82}
+.fv-web .nav b{color:#1B2635;margin-right:10px;font-size:13px}
+.fv-web .cards2{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:18px 20px 0}
+.fv-web .cards2 div{background:#fff;border:1px solid #E1E6EE;border-radius:8px;padding:12px 14px}
+.fv-web small{display:block;font-size:10.5px;color:#7A8CA3}
+.fv-web strong{font-size:20px;font-weight:600}
+.fv-web .chart{margin:14px 20px 0;height:170px;background:#fff;border:1px solid #E1E6EE;border-radius:8px;display:flex;align-items:flex-end;gap:12px;padding:14px 18px}
+.fv-web .chart i{flex:1;background:#3B82F6;border-radius:3px 3px 0 0;opacity:.85}
+.fv-sheet{flex:1;min-height:0;background:#fff;overflow:hidden}
+.fv-sheet table{border-collapse:collapse;font-family:-apple-system,system-ui,sans-serif;font-size:12px;color:#1B2635}
+.fv-sheet th,.fv-sheet td{border:1px solid #D9DEE6;padding:5px 12px;height:26px}
+.fv-sheet th{background:#F1F3F6;color:#7A8CA3;font-weight:400;font-size:11px;min-width:30px}
+.fv-sheet td{min-width:96px;text-align:right}
+.fv-sheet td:first-of-type{text-align:left}
+.fv-sheet td.h{font-weight:600;background:#EAF3FF}
+.fv-text{flex:1;min-height:0;padding:16px 20px;white-space:pre;font-size:11.5px;line-height:1.9;color:#CFE2F7;overflow:hidden}
+
 /* ── 반응형 ───────────────────────────────────────── */
 @media (max-width:900px){
   .hero{grid-template-columns:1fr}
   .hero .tree{border-right:0;border-bottom:1px solid var(--divider)}
   .hero .doc{padding:30px 22px 26px}
-  .cards,.keys{grid-template-columns:1fr}
+  .keys{grid-template-columns:1fr}
   .split,.dl,.sup{grid-template-columns:1fr}
   .sup .card-embed{height:225px}
   .dl .art{order:-1}
@@ -485,7 +520,7 @@ footer .sp{margin-left:auto}
   </section>
 
   <!-- ── 화면 배치 ───────────────────────────────── -->
-  <section class="panel" id="layouts">
+  <section class="panel" id="layouts" data-lx>
     <div class="bar"><b>~/화면</b><span>— 한 창을 나눠 쓰는 방법</span><span class="count">배치 6가지</span></div>
     <div class="pad">
       <div class="lx-tabs" role="tablist" aria-label="화면 배치">
@@ -634,57 +669,181 @@ footer .sp{margin-left:auto}
   </section>
 
   <!-- ── 뷰어 ─────────────────────────────────────── -->
-  <section class="panel" id="viewer">
+  <section class="panel" id="viewer" data-lx>
     <div class="bar"><b>~/뷰어</b><span>— 트리에서 고르면 오른쪽에 그려지는 것들</span></div>
     <div class="pad">
-      <div class="cards">
-        <div class="card">
-          <h3>수식</h3>
-          <div class="demo">
-            <span class="formula">
-              <span class="int">∫</span><span><sup>∞</sup><br><sub>0</sub></span>
-              <span>e<sup>−x²</sup> dx</span><span>=</span>
-              <span class="frac"><span class="num">√π</span><span class="den">2</span></span>
-            </span>
+      <div class="lx-tabs" role="tablist" aria-label="파일 종류">
+        <button class="lx-tab" role="tab" aria-selected="true" data-layout="md" data-status="README.md"
+          data-cap="<b>마크다운.</b> 표·코드 블록·인용·체크리스트를 앱 테마에 맞춰 그립니다. 긴 문서에는 오른쪽에 목차가 붙고, 문서 폴더의 상대 경로 이미지도 그대로 보입니다. ⌘E로 그 자리에서 고칩니다.">마크다운</button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="math" data-status="노트.md"
+          data-cap="<b>수식과 다이어그램.</b> <code>$...$</code>·<code>$$...$$</code> 수식은 KaTeX로, mermaid 코드 블록은 순서도·시퀀스 다이어그램으로 그립니다. 인터넷 연결 없이 앱 안에서 처리합니다.">수식 · 다이어그램</button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="pdf" data-status="분기보고.pdf"
+          data-cap="<b>PDF.</b> 전용 뷰어로 열어 쪽 번호와 배율을 헤더에 보여 줍니다. ⌘휠·핀치로 확대하고, 확대한 채 끌어서 옮기며, ⌘F로 본문을 찾습니다.">PDF</button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="img" data-status="표지.png"
+          data-cap="<b>이미지.</b> PNG·JPG·HEIC·WebP·SVG 등을 원본 비율 그대로 창에 맞춰 보여 줍니다. 확대하면 끌어서 옮길 수 있습니다.">이미지</button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="html" data-status="대시보드.html"
+          data-cap="<b>HTML.</b> 브라우저처럼 웹뷰로 렌더링합니다. 같은 폴더의 CSS·이미지도 함께 불러오고, ⌘E를 누르면 원문 소스를 고칩니다.">HTML</button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="office" data-status="예산.xlsx"
+          data-cap="<b>Office · iWork.</b> Word·Excel·PowerPoint·Pages·Numbers·Keynote 문서를 macOS 훑어보기로 바로 엽니다(읽기 전용). LibreOffice가 설치돼 있으면 Office 문서를 PDF로 바꿔 원본의 표 폭과 글꼴 그대로 보여 줍니다.">Office</button>
+        <button class="lx-tab" role="tab" aria-selected="false" tabindex="-1" data-layout="text" data-status="server.log"
+          data-cap="<b>텍스트.</b> 로그·CSV·코드·설정 파일은 ALL 보기에서 고정폭 평문으로 엽니다. 열 정렬이 깨지지 않고, 핀치로 글자 크기를 바꿉니다.">텍스트</button>
+      </div>
+
+      <div class="lx-stage" role="tabpanel" aria-label="파일 종류별 뷰어 그림">
+        <div class="lx-win" data-layout="md" aria-hidden="true">
+          <div class="lx-title"><i></i><i></i><i></i><span>Mac Commander</span></div>
+          <div class="lx-body">
+            <div class="lx-tree">
+              <div class="lx-th">~/project <span class="m">ALL</span></div>
+              <ul>
+                <li><span class="g">▾ </span><span class="d">docs</span></li>
+                <li data-f="md" class="sel"><span class="g">│ ├ </span>README.md</li>
+                <li data-f="math"><span class="g">│ ├ </span>노트.md</li>
+                <li data-f="pdf"><span class="g">│ └ </span>분기보고.pdf</li>
+                <li><span class="g">▾ </span><span class="d">design</span></li>
+                <li data-f="img"><span class="g">│ ├ </span>표지.png</li>
+                <li data-f="html"><span class="g">│ └ </span>대시보드.html</li>
+                <li><span class="g">▾ </span><span class="d">finance</span></li>
+                <li data-f="office"><span class="g">│ └ </span>예산.xlsx</li>
+                <li><span class="g">▾ </span><span class="d">logs</span></li>
+                <li data-f="text"><span class="g">│ └ </span>server.log</li>
+              </ul>
+            </div>
+            <div class="lx-tree"></div>
+            <div class="lx-work">
+              <div class="lx-views">
+                <div class="lx-vp p1">
+
+                  <div class="fv on" data-f="md">
+                    <div class="lx-vh">README.md</div>
+                    <div class="fv-md">
+                      <div class="lx-vc">
+                        <h4>프로젝트 안내</h4>
+                        <div class="lx-ln" style="width:90%"></div>
+                        <div class="lx-ln" style="width:72%"></div>
+                        <h5>할 일</h5>
+                        <div class="fv-chk"><span>☑</span> 디자인 시안 확정</div>
+                        <div class="fv-chk"><span>☐</span> 분기 보고서 검토</div>
+                        <div class="fv-quote">문서는 한 창에서 고르고, 읽고, 고친다.</div>
+                        <table class="mdtable">
+                          <tr><th>담당</th><th>항목</th><th>상태</th></tr>
+                          <tr><td>디자인</td><td>표지</td><td>완료</td></tr>
+                          <tr><td>재무</td><td>예산</td><td>검토 중</td></tr>
+                        </table>
+                      </div>
+                      <div class="fv-toc">
+                        <div class="t">목차</div>
+                        <div class="on">프로젝트 안내</div>
+                        <div>할 일</div>
+                        <div>일정</div>
+                        <div class="s">마일스톤</div>
+                        <div class="s">회고</div>
+                        <div>참고 자료</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="fv" data-f="math">
+                    <div class="lx-vh">노트.md</div>
+                    <div class="lx-vc">
+                      <h4>가우스 적분</h4>
+                      <div class="lx-ln" style="width:70%"></div>
+                      <div class="fv-center">
+                        <span class="formula">
+                          <span class="int">∫</span><span><sup>∞</sup><br><sub>−∞</sub></span>
+                          <span>e<sup>−x²</sup> dx</span><span>=</span><span>√π</span>
+                        </span>
+                      </div>
+                      <h5>처리 흐름</h5>
+                      <svg width="420" height="92" viewBox="0 0 420 92" style="display:block">
+                        <g fill="none" stroke="#2A6FB0">
+                          <rect x="1" y="33" width="84" height="26"/><rect x="120" y="4" width="92" height="26"/>
+                          <rect x="120" y="62" width="92" height="26"/><rect x="250" y="33" width="84" height="26" stroke="#33CCFF"/>
+                        </g>
+                        <g stroke="#33CCFF" fill="none"><path d="M85 46h17V17h18M85 46h17v29h18M212 17h19v29h19M212 75h19V46h19"/></g>
+                        <g font-family="IBM Plex Mono, monospace" font-size="11" fill="#E6F1FF" text-anchor="middle">
+                          <text x="43" y="50">마크다운</text><text x="166" y="21">KaTeX</text>
+                          <text x="166" y="79">mermaid</text><text x="292" y="50" fill="#33CCFF">화면</text>
+                        </g>
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div class="fv" data-f="pdf">
+                    <div class="lx-vh">분기보고.pdf<span class="fv-meta">3 / 12쪽 · 100%</span></div>
+                    <div class="fv-pdf">
+                      <div class="pg">
+                        <div class="pt">3분기 보고</div>
+                        <div class="pl" style="width:92%"></div><div class="pl" style="width:86%"></div>
+                        <div class="pl" style="width:64%"></div>
+                        <div class="bars"><i style="height:38%"></i><i style="height:62%"></i><i style="height:48%"></i><i style="height:84%"></i></div>
+                        <div class="pl" style="width:88%"></div><div class="pl" style="width:74%"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="fv" data-f="img">
+                    <div class="lx-vh">표지.png<span class="fv-meta">맞춤 · 42%</span></div>
+                    <div class="fv-img">
+                      <svg viewBox="0 0 480 270" width="560" height="315">
+                        <defs><linearGradient id="fvsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#10325C"/><stop offset="1" stop-color="#2A6FB0"/></linearGradient></defs>
+                        <rect width="480" height="270" fill="url(#fvsky)"/>
+                        <circle cx="360" cy="86" r="30" fill="#FFC46B"/>
+                        <path d="M0 270L0 190L90 120L170 185L250 105L340 175L400 140L480 190L480 270Z" fill="#0A1A33"/>
+                        <path d="M0 270L0 225L120 180L220 228L320 190L480 235L480 270Z" fill="#050D1A"/>
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div class="fv" data-f="html">
+                    <div class="lx-vh">대시보드.html</div>
+                    <div class="fv-web">
+                      <div class="nav"><b>Dashboard</b><span>개요</span><span>보고서</span><span>설정</span></div>
+                      <div class="cards2">
+                        <div><small>방문</small><strong>12,480</strong></div>
+                        <div><small>전환</small><strong>3.2%</strong></div>
+                        <div><small>매출</small><strong>₩4.1M</strong></div>
+                      </div>
+                      <div class="chart"><i style="height:30%"></i><i style="height:52%"></i><i style="height:44%"></i><i style="height:70%"></i><i style="height:61%"></i><i style="height:88%"></i><i style="height:76%"></i></div>
+                    </div>
+                  </div>
+
+                  <div class="fv" data-f="office">
+                    <div class="lx-vh">예산.xlsx<span class="fv-meta">읽기 전용</span></div>
+                    <div class="fv-sheet">
+                      <table>
+                        <tr><th></th><th>A</th><th>B</th><th>C</th><th>D</th></tr>
+                        <tr><th>1</th><td class="h">항목</td><td class="h">1분기</td><td class="h">2분기</td><td class="h">합계</td></tr>
+                        <tr><th>2</th><td>인건비</td><td>1,200</td><td>1,250</td><td>2,450</td></tr>
+                        <tr><th>3</th><td>서버</td><td>340</td><td>360</td><td>700</td></tr>
+                        <tr><th>4</th><td>마케팅</td><td>520</td><td>610</td><td>1,130</td></tr>
+                        <tr><th>5</th><td>기타</td><td>90</td><td>75</td><td>165</td></tr>
+                        <tr><th>6</th><td class="h">합계</td><td class="h">2,150</td><td class="h">2,295</td><td class="h">4,445</td></tr>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div class="fv" data-f="text">
+                    <div class="lx-vh">server.log</div>
+                    <div class="fv-text">2026-09-30 09:12:03  INFO   server started on :8080
+2026-09-30 09:12:04  INFO   connected to database
+2026-09-30 09:13:41  INFO   GET  /api/reports      200   38ms
+2026-09-30 09:13:42  INFO   GET  /api/reports/3    200   12ms
+2026-09-30 09:15:10  WARN   slow query            1204ms
+2026-09-30 09:15:11  INFO   POST /api/budget       201   51ms
+2026-09-30 09:17:26  ERROR  upload failed: file too large
+2026-09-30 09:17:30  INFO   GET  /health           200    2ms</div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
           </div>
-          <p>KaTeX로 <code>$...$</code>와 <code>$$...$$</code>를 그립니다. 인터넷 연결 없이 앱 안에서 처리합니다.</p>
-        </div>
-        <div class="card">
-          <h3>다이어그램</h3>
-          <div class="demo">
-            <svg width="196" height="86" viewBox="0 0 196 86" role="img" aria-label="mermaid 순서도 예시">
-              <g fill="none" stroke="#2A6FB0" stroke-width="1">
-                <rect x="1" y="30" width="56" height="26"/>
-                <rect x="76" y="4" width="56" height="26"/>
-                <rect x="76" y="56" width="56" height="26"/>
-                <rect x="150" y="30" width="45" height="26" stroke="#33CCFF"/>
-              </g>
-              <g stroke="#33CCFF" stroke-width="1">
-                <path d="M57 43 h9 l0 -26 h10" fill="none"/>
-                <path d="M57 43 h9 l0 26 h10" fill="none"/>
-                <path d="M132 17 h9 l0 26 h9" fill="none"/>
-                <path d="M132 69 h9 l0 -26 h9" fill="none"/>
-              </g>
-              <g font-family="IBM Plex Mono, monospace" font-size="9" fill="#E6F1FF" text-anchor="middle">
-                <text x="29" y="47">문서</text><text x="104" y="21">읽기</text>
-                <text x="104" y="73">편집</text><text x="172" y="47" fill="#33CCFF">저장</text>
-              </g>
-            </svg>
-          </div>
-          <p>Mermaid 코드 블록을 순서도·시퀀스 다이어그램으로 렌더링합니다.</p>
-        </div>
-        <div class="card">
-          <h3>표와 코드</h3>
-          <div class="demo">
-            <table class="mdtable">
-              <tr><th>키</th><th>값</th></tr>
-              <tr><td>accent</td><td>#33CCFF</td></tr>
-              <tr><td>panel</td><td>#0A1A33</td></tr>
-            </table>
-          </div>
-          <p>표, 코드 블록, 인용, 체크리스트를 앱 테마에 맞춘 스타일로 보여줍니다.</p>
+          <div class="lx-status"><span class="nm">README.md</span><span class="r">항목 11개</span></div>
         </div>
       </div>
+      <p class="lx-cap"><b>마크다운.</b> 표·코드 블록·인용·체크리스트를 앱 테마에 맞춰 그립니다. 긴 문서에는 오른쪽에 목차가 붙고, 문서 폴더의 상대 경로 이미지도 그대로 보입니다. ⌘E로 그 자리에서 고칩니다.</p>
+
       <div class="types">
         <span class="chip hi">.md</span><span class="chip hi">.markdown</span><span class="chip hi">.mdown</span>
         <span class="chip hi">.mkd</span><span class="chip">.pdf</span><span class="chip">.html</span>
@@ -699,10 +858,8 @@ footer .sp{margin-left:auto}
         <span class="chip">.key</span>
       </div>
       <p style="font-size:12.5px;color:#A9BFD6;margin:14px 0 0">
-        긴 마크다운 문서에는 오른쪽에 목차가 붙고, ⌘F로 문서 안을 찾습니다. 마크다운 안에 넣은 상대 경로 이미지도 그대로 보입니다.
-        PDF는 쪽 표시와 확대가 되는 전용 뷰어로, 이미지는 원본 비율 그대로, HTML은 웹뷰로,
-        Word·Excel·PowerPoint·Pages·Numbers·Keynote 문서는 macOS 훑어보기(Quick Look)로 엽니다(읽기 전용).
-        그 밖의 파일은 ALL 보기에서 텍스트로 엽니다. 트랙패드 핀치로 확대할 수 있습니다.
+        위 형식은 MD 보기에서도 트리에 나타납니다. 그 밖의 파일은 ALL 보기에서 텍스트로 엽니다.
+        마크다운·PDF·HTML·텍스트는 ⌘F로 본문을 찾고, 트랙패드 핀치로 확대합니다.
       </p>
     </div>
   </section>
@@ -930,14 +1087,14 @@ footer .sp{margin-left:auto}
   sections.forEach(function (s) { io.observe(s.el); });
 })();
 
-// 화면 배치 그림: 탭으로 배치를 바꾸고, 사용자가 손대기 전까지는 저절로 넘긴다.
-(function () {
-  var root = document.getElementById('layouts');
-  if (!root) return;
+// 창 그림(화면 배치·파일 종류): 탭으로 장면을 바꾸고, 사용자가 손대기 전까지는 저절로 넘긴다.
+Array.prototype.forEach.call(document.querySelectorAll('[data-lx]'), function (root) {
   var stage = root.querySelector('.lx-stage');
   var win = root.querySelector('.lx-win');
   var cap = root.querySelector('.lx-cap');
+  var status = root.querySelector('.lx-status .nm');
   var tabs = Array.prototype.slice.call(root.querySelectorAll('.lx-tab'));
+  var picks = Array.prototype.slice.call(win.querySelectorAll('[data-f]'));
   var current = 0;
 
   // 960px 설계 크기의 창을 무대 폭에 맞춰 축소한다.
@@ -948,12 +1105,18 @@ footer .sp{margin-left:auto}
 
   function show(i) {
     current = (i + tabs.length) % tabs.length;
+    var tab = tabs[current];
     tabs.forEach(function (t, k) {
       t.setAttribute('aria-selected', String(k === current));
       t.tabIndex = k === current ? 0 : -1;
     });
-    win.dataset.layout = tabs[current].dataset.layout;
-    cap.innerHTML = tabs[current].dataset.cap;
+    win.dataset.layout = tab.dataset.layout;
+    cap.innerHTML = tab.dataset.cap;
+    // 파일 종류 그림: 트리의 선택 행과 뷰어 화면을 함께 바꾼다.
+    picks.forEach(function (el) {
+      el.classList.toggle(el.tagName === 'LI' ? 'sel' : 'on', el.dataset.f === tab.dataset.layout);
+    });
+    if (status && tab.dataset.status) status.textContent = tab.dataset.status;
   }
 
   var timer = null;
@@ -982,7 +1145,7 @@ footer .sp{margin-left:auto}
       tick();
     }, { threshold: 0.4 }).observe(stage);
   }
-})();
+});
 </script>
 </body>
 </html>
