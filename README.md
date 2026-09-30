@@ -4,7 +4,7 @@ macOS용 마크다운 파일 탐색 · 편집 앱. SwiftUI로 작성한 네이�
 
 *A native macOS app for browsing and editing Markdown files — with math, diagrams, a built-in terminal, and multi-panel viewers. Open source under GPLv3.*
 
-**➡️ [최신 버전 다운로드](https://github.com/codegeargit/mac-commander-releases/releases/latest)** · [소개 페이지](https://maccommander.com/)
+**➡️ [최신 버전 다운로드](https://github.com/codegeargit/mac-commander-releases/releases/latest)** · `brew install --cask codegeargit/tap/mac-commander` · [소개 페이지](https://maccommander.com/)
 
 ## 주요 기능
 
@@ -16,7 +16,17 @@ macOS용 마크다운 파일 탐색 · 편집 앱. SwiftUI로 작성한 네이�
 - ⌘P 빠른 열기, ⇧⌘F 폴더 본문 검색, 멀티 리네임
 - 테마 4종(후원자 테마 8종 별도), 한국어 · 영어, Sparkle 자동 업데이트
 
-설치 후에는 새 버전을 자동으로 받습니다(도움말 ▸ 업데이트 확인…으로 바로 확인 가능).
+## 설치
+
+[Homebrew](https://brew.sh)로 설치하는 방법이 가장 간단합니다:
+
+```bash
+brew install --cask codegeargit/tap/mac-commander
+```
+
+또는 [최신 dmg](https://github.com/codegeargit/mac-commander-releases/releases/latest)를 받아 `MacCommander.app`을 응용 프로그램 폴더로 옮기세요. macOS 14 이상에서 동작하며, Apple 공증을 거친 앱이라 Gatekeeper 경고 없이 열립니다.
+
+설치 후에는 새 버전을 자동으로 받습니다(도움말 ▸ 업데이트 확인…으로 바로 확인 가능). Homebrew로 설치했어도 `brew upgrade` 없이 앱이 스스로 업데이트합니다.
 
 ## 후원
 
@@ -101,4 +111,4 @@ App Store가 아닌 **GitHub 직접 배포**를 씁니다. 임베디드 터미�
 ./scripts/release.sh --no-notarize # 서명까지만(로컬 확인용, 배포 안 함)
 ```
 
-`project.yml`의 버전을 올리고 실행하면 공개 배포 저장소 [mac-commander-releases](https://github.com/codegeargit/mac-commander-releases)에 dmg와 Sparkle appcast가 발행되고, 기존 사용자 앱이 자동 업데이트로 받습니다. appcast 서명용 EdDSA 개인키는 리포에 없으며 메인테이너의 Keychain에만 있습니다.
+`project.yml`의 버전을 올리고 실행하면 공개 배포 저장소 [mac-commander-releases](https://github.com/codegeargit/mac-commander-releases)에 dmg와 Sparkle appcast가 발행되고, 기존 사용자 앱이 자동 업데이트로 받습니다. 이어서 [homebrew-tap](https://github.com/codegeargit/homebrew-tap)의 cask `version`·`sha256`도 이번 dmg로 갱신합니다. appcast 서명용 EdDSA 개인키는 리포에 없으며 메인테이너의 Keychain에만 있습니다.

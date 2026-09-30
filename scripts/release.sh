@@ -42,6 +42,13 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-MC_NOTARY}"
 # gh CLI는 codegeargit 계정이어야 한다(dukehabit이면 404).
 RELEASE_REPO="${RELEASE_REPO:-codegeargit/mac-commander-releases}"
 
+# Homebrew tap. 릴리스 발행 뒤 cask의 version·sha256을 이번 dmg로 갱신한다.
+# 공개 리포라 커밋은 GitHub noreply 주소로 남긴다.
+TAP_REPO="${TAP_REPO:-codegeargit/homebrew-tap}"
+TAP_CASK="Casks/mac-commander.rb"
+PUBLIC_GIT_NAME="${PUBLIC_GIT_NAME:-thom}"
+PUBLIC_GIT_EMAIL="${PUBLIC_GIT_EMAIL:-3898070+codegeargit@users.noreply.github.com}"
+
 BUILD_DIR="$PROJECT_DIR/build/dist"
 DIST_DIR="$PROJECT_DIR/dist"
 BUILT_APP="$BUILD_DIR/$APP_NAME"
@@ -248,6 +255,51 @@ else
   fi
   echo "  ✅ GitHub Release 발행 완료: https://github.com/$RELEASE_REPO/releases/tag/$TAG"
   echo "     appcast: https://github.com/$RELEASE_REPO/releases/latest/download/appcast.xml"
+  RELEASED=1
+fi
+
+# ── 8. Homebrew tap 갱신 ─────────────────────────────────────────────────────
+# 실패해도 릴리스는 이미 끝났으므로 경고만 남긴다(수동 갱신 방법 안내).
+update_homebrew_tap() {
+  local dmg_url="https://github.com/$RELEASE_REPO/releases/download/v$VERSION/$(basename "$DMG_PATH")"
+  local sha remote_sha work
+  sha="$(shasum -a 256 "$DMG_PATH" | cut -d' ' -f1)"
+
+  # 업로드된 자산이 로컬 dmg와 같은지 확인한다. curl -f가 없으면 404 페이지를
+  # 받아 엉뚱한 해시를 계산하므로 반드시 -f. 자산 반영이 늦을 수 있어 재시도.
+  local try
+  for try in 1 2 3 4 5; do
+    remote_sha="$(curl -fsSL "$dmg_url" | shasum -a 256 | cut -d' ' -f1)" && break
+    remote_sha=""; sleep 5
+  done
+  if [[ "$remote_sha" != "$sha" ]]; then
+    echo "  ✗ 업로드된 dmg 해시가 로컬과 다릅니다(remote=${remote_sha:-다운로드 실패})."
+    return 1
+  fi
+
+  work="$(mktemp -d)"
+  gh repo clone "$TAP_REPO" "$work" -- -q || { rm -rf "$work"; return 1; }
+  sed -i '' -E \
+    -e "s/^  version \".*\"/  version \"$VERSION\"/" \
+    -e "s/^  sha256 \".*\"/  sha256 \"$sha\"/" \
+    "$work/$TAP_CASK"
+  if git -C "$work" diff --quiet; then
+    echo "  tap이 이미 $VERSION 입니다 — 푸시 생략"
+  else
+    git -C "$work" -c user.name="$PUBLIC_GIT_NAME" -c user.email="$PUBLIC_GIT_EMAIL" \
+      commit -qam "Update mac-commander to $VERSION" \
+      && git -C "$work" push -q origin HEAD \
+      || { rm -rf "$work"; return 1; }
+    echo "  ✅ Homebrew tap 갱신: $TAP_REPO ($VERSION, $sha)"
+  fi
+  rm -rf "$work"
+}
+
+if [[ "${RELEASED:-0}" == 1 ]]; then
+  echo "▶ 8  Homebrew tap 갱신"
+  if ! update_homebrew_tap; then
+    echo "  ⚠️  tap 갱신 실패. $TAP_REPO 의 $TAP_CASK 에서 version·sha256을 직접 고치세요."
+  fi
 fi
 
 # Google Drive 업로드는 GitHub Releases 배포로 대체되어 제거했다(2026-07).
