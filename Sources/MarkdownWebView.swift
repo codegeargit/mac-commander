@@ -520,7 +520,10 @@ enum MarkdownDocument {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
         if let data = try? encoder.encode(s), let str = String(data: data, encoding: .utf8) {
-            return str
+            // 인라인 <script> 안에 들어가므로 원문의 "</script>"·"<!--"가 HTML 파서에
+            // 스크립트를 끊게 만든다(Vue 예시 코드가 든 문서가 통째로 깨짐).
+            // JSON 문자열 안의 "<"를 <로 바꾸면 JS가 읽는 값은 같고 태그로는 보이지 않는다.
+            return str.replacingOccurrences(of: "<", with: "\\u003c")
         }
         // 극히 예외적 실패 시 빈 문자열로.
         return "\"\""
