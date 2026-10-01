@@ -129,6 +129,16 @@ enum GitStatusReader {
         return snapshot
     }
 
+    /// 파일의 마지막 커밋본(HEAD). 저장소 밖이거나, 아직 커밋된 적 없는 파일이면 nil.
+    ///
+    /// `HEAD:./이름`은 실행 폴더 기준 경로라 파일이 든 폴더에서 돌린다. 저장소 최상위 기준
+    /// 상대 경로를 따로 구하지 않아도 되고, /private/tmp 같은 경로 정규화 문제도 피한다.
+    static func committedContent(of file: URL) -> String? {
+        guard let git = gitURL else { return nil }
+        return run(git, ["show", "HEAD:./" + file.lastPathComponent],
+                   in: file.deletingLastPathComponent())
+    }
+
     /// git을 실행해 표준 출력을 돌려준다. 실패하면 nil.
     private static func run(_ git: URL, _ arguments: [String], in directory: URL) -> String? {
         let process = Process()

@@ -353,6 +353,7 @@ enum L10n {
     // MARK: 최근 변경 · git
     case recentChangeHelp(Int)   // 트리의 최근 변경 점 툴팁(몇 분 전)
     case docChangesCount         // 뷰어: 다시 읽은 문서에서 바뀐 곳 개수("{n}"이 개수 자리)
+    case docChangesSinceCommit   // 뷰어: 마지막 커밋과 비교해 바뀐 곳 개수("{n}"이 개수 자리)
     case docChangesNext          // 뷰어: 다음 바뀐 곳으로
     case docChangesDismiss       // 뷰어: 바뀐 곳 표시 지우기
 
@@ -720,6 +721,7 @@ enum L10n {
             ko = minutes < 1 ? "방금 바뀜" : "\(minutes)분 전에 바뀜"
             en = minutes < 1 ? "Changed just now" : "Changed \(minutes) min ago"
         case .docChangesCount:     ko = "바뀐 곳 {n}"; en = "{n} changed"
+        case .docChangesSinceCommit: ko = "커밋 이후 바뀐 곳 {n}"; en = "{n} changed since commit"
         case .docChangesNext:      ko = "다음 바뀐 곳으로"; en = "Next change"
         case .docChangesDismiss:   ko = "표시 지우기"; en = "Clear highlights"
 

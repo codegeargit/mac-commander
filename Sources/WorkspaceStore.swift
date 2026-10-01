@@ -38,6 +38,9 @@ struct ViewerPanel: Identifiable {
     var sourcePaneID: UUID?
     /// 디스크에 저장된 본문(렌더링 및 dirty 판정의 기준).
     var content: String?
+    /// 마크다운 문서의 마지막 커밋본. 열 때 본문과 다르면 채워 "커밋 이후 바뀐 곳"을 칠한다.
+    /// git 저장소 밖이거나 커밋된 적 없는 파일, 커밋본과 같은 파일이면 nil.
+    var committedContent: String?
     /// 편집 모드 여부. true면 TextEditor, false면 마크다운 렌더링.
     var isEditing: Bool = false
     /// 편집 중인 본문(편집 모드에서만 의미). 저장 시 content로 반영.
@@ -808,6 +811,8 @@ final class WorkspaceStore: ObservableObject {
         let text = isBinary ? nil : ((try? String(contentsOf: url, encoding: .utf8)) ?? L(.cannotReadFile))
         panels[index].fileURL = url
         panels[index].content = text
+        panels[index].committedContent = nil
+        if isMd { loadCommittedContent(of: url, panelID: panels[index].id) }
         panels[index].isPDF = isPdf
         panels[index].isImage = isImg
         panels[index].isHTML = isHtml
@@ -2471,6 +2476,26 @@ final class WorkspaceStore: ObservableObject {
         // 파일 인덱스는 여기서 다시 훑지 않고 낡았다고만 표시한다. 파일 하나 저장할 때마다
         // 수만 개를 다시 훑을 이유가 없다. 검색 창을 열 때 필요하면 그때 갱신한다.
         fileIndex.markStale()
+    }
+
+    /// 마지막 커밋본을 백그라운드에서 읽어 패널에 담는다. 그사이 다른 파일을 열었으면 버린다.
+    private func loadCommittedContent(of url: URL, panelID: UUID) {
+        DispatchQueue.global(qos: .utility).async {
+            let committed = GitStatusReader.committedContent(of: url)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let committed,
+                      let index = self.panels.firstIndex(where: { $0.id == panelID }),
+                      self.panels[index].fileURL == url,
+                      self.panels[index].content != committed else { return }
+                self.panels[index].committedContent = committed
+            }
+        }
+    }
+
+    /// 커밋본으로 한 번 칠했으면 비운다(같은 문서를 다시 그려도 또 칠하지 않게).
+    func consumeCommittedContent(panel index: Int) {
+        guard panels.indices.contains(index) else { return }
+        panels[index].committedContent = nil
     }
 
     /// 열린 각 패널의 파일을 디스크에서 다시 읽어 내용이 바뀌었으면 갱신한다.

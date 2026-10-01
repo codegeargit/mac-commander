@@ -120,6 +120,10 @@ struct DocumentDetailView: View {
                 // baseURL로 문서 폴더를 넘겨야 `![](./images/foo.png)` 상대 경로가 해석된다.
                 MarkdownWebView(
                     content: content,
+                    committedContent: panel.committedContent,
+                    onCommittedApplied: {
+                        Task { @MainActor in store.consumeCommittedContent(panel: panelIndex) }
+                    },
                     fileURL: panel.fileURL,
                     fontSize: store.viewerFontSize,
                     colors: theme.colors,

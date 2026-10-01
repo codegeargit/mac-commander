@@ -15,6 +15,11 @@ import WebKit
 struct MarkdownWebView: View {
     /// 마크다운 원문.
     let content: String
+    /// 마지막 커밋본. 있으면 문서를 처음 그릴 때 이것과 비교해 바뀐 곳을 칠한다.
+    let committedContent: String?
+    /// 커밋본으로 한 번 칠했을 때 호출 — 스토어가 커밋본을 비워, 웹뷰를 새로 만들어도
+    /// (편집에서 돌아오기·찾기 바 등) 지운 표시가 되살아나지 않게 한다.
+    let onCommittedApplied: () -> Void
     /// 문서 파일. 상대 경로 이미지·링크(`![](images/foo.png)`)를 해석하는 기준 폴더이자,
     /// 스크롤 위치를 이어 붙일 때 쓰는 문서 식별자다.
     let fileURL: URL?
@@ -45,6 +50,8 @@ struct MarkdownWebView: View {
     var body: some View {
         MarkdownWebViewRepresentable(
             content: content,
+            committedContent: committedContent,
+            onCommittedApplied: onCommittedApplied,
             fileURL: fileURL,
             fontSize: fontSize,
             colors: colors,
@@ -64,6 +71,8 @@ struct MarkdownWebView: View {
 /// marked/KaTeX/mermaid를 로드해 마크다운을 렌더하는 WKWebView 래퍼(AppKit 브릿지).
 private struct MarkdownWebViewRepresentable: NSViewRepresentable {
     let content: String
+    let committedContent: String?
+    let onCommittedApplied: () -> Void
     let fileURL: URL?
     let fontSize: CGFloat
     let colors: ColorSet
@@ -113,7 +122,7 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         if let webView = webView as? MarkdownWKWebView { syncSendMenu(webView) }
         // 내용·테마가 바뀌면 다시 로드한다. 같은 값이면 건너뛴다.
         let key = context.coordinator.key(content: content, isDark: isDark, colors: colors)
-        if key != context.coordinator.lastKey {
+        if key != context.coordinator.lastKey || hasNewCommittedBaseline(context.coordinator) {
             load(webView, context: context)
         } else {
             // 글자 크기는 문서를 다시 그리지 않고 CSS만 바꾼다.
@@ -121,6 +130,12 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         }
         context.coordinator.runFindIfNeeded(findRequest, in: webView)
         context.coordinator.applySendButton(in: webView)
+    }
+
+    /// 아직 비교에 쓰지 않은 커밋본이 있는지(같은 문서일 때만).
+    private func hasNewCommittedBaseline(_ coordinator: Coordinator) -> Bool {
+        guard let committed = committedContent, committed != content else { return false }
+        return committed != coordinator.appliedCommitted
     }
 
     private func syncCallbacks(_ coordinator: Coordinator) {
@@ -147,8 +162,18 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         // 이전 원문을 함께 넘겨 바뀐 블록을 칠하게 한다. 편집 모드는 이 웹뷰를 아예 내리므로
         // 내가 직접 고친 내용은 여기로 오지 않는다.
         let coordinator = context.coordinator
-        let previous = coordinator.lastFileURL == fileURL && coordinator.lastContent != content
+        var previous = coordinator.lastFileURL == fileURL && coordinator.lastContent != content
             ? coordinator.lastContent : nil
+        // 커밋본은 처음 한 번만 비교에 쓴다(뒤늦게 도착하면 그때 다시 그린다). 테마를 바꾸는 등
+        // 다시 그릴 때마다 칠하면 지운(×) 표시가 되살아난다. 열어 둔 채 바뀐 것은 위의
+        // 직전 내용 비교가 맡는다 — 방금 바뀐 곳을 보여 주는 편이 쓸모 있다.
+        var sinceCommit = false
+        if previous == nil, hasNewCommittedBaseline(coordinator), let committed = committedContent {
+            previous = committed
+            sinceCommit = true
+            onCommittedApplied()
+        }
+        coordinator.appliedCommitted = committedContent
         coordinator.lastFileURL = fileURL
         coordinator.lastContent = content
         // 폰트·테마를 바꾸거나 편집을 마치고 돌아올 때마다 문서를 통째로 다시 그린다.
@@ -156,7 +181,7 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         let html = MarkdownDocument.html(
             content: content, fontSize: fontSize, colors: colors, isDark: isDark,
             scrollRatio: scrollRatio(), previousContent: previous,
-            changeLabels: MarkdownDocument.ChangeLabels.current)
+            changeLabels: MarkdownDocument.ChangeLabels.current(sinceCommit: sinceCommit))
         // baseURL: 이미지·링크 상대 경로 해석용 문서 폴더. 자산은 HTML에 인라인되므로
         // 자산 로딩엔 baseURL이 필요 없다. file:// 대신 mdlocal:// 스킴을 쓰는 이유는
         // MarkdownLocalResource 주석 참고 — file://이면 이미지가 로드되지 않는다.
@@ -174,6 +199,8 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         /// 마지막으로 그린 문서와 원문. 같은 문서의 내용이 바뀌었을 때 바뀐 곳을 칠하는 데 쓴다.
         var lastFileURL: URL?
         var lastContent: String?
+        /// 이미 비교에 쓴 커밋본(같은 커밋본으로 두 번 칠하지 않게).
+        var appliedCommitted: String?
         /// 마지막으로 웹뷰에 반영한 본문 글자 크기(같으면 JS를 다시 실행하지 않는다).
         var lastFontSize: CGFloat = 0
         /// 로컬 문서 링크를 뷰어에서 열기 위한 콜백(패널을 캡처하고 있다).
@@ -374,9 +401,9 @@ enum MarkdownDocument {
         var next: String
         var dismiss: String
 
-        @MainActor static var current: ChangeLabels {
+        @MainActor static func current(sinceCommit: Bool) -> ChangeLabels {
             let loc = LocalizationManager.shared
-            return ChangeLabels(count: loc.string(.docChangesCount),
+            return ChangeLabels(count: loc.string(sinceCommit ? .docChangesSinceCommit : .docChangesCount),
                                 next: loc.string(.docChangesNext),
                                 dismiss: loc.string(.docChangesDismiss))
         }
