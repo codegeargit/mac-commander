@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mac Commander — Finder와 뷰어를 한 창에 합친 macOS 파일 매니저</title>
-<meta name="description" content="파일 트리와 문서 뷰어를 한 창에 합친 macOS 앱. 트리에서 고르면 옆 패널에서 마크다운·PDF·이미지·Office 문서를 바로 읽고, 두 트리 사이로 복사·이동합니다.">
+<title>Mac Commander — AI 코딩 시대의 문서 작업대</title>
+<meta name="description" content="프로젝트 폴더의 마크다운을 터미널 옆에서 바로 읽는 macOS 앱. AI가 고친 파일은 트리에 표시되고, 문서에서는 바뀐 곳이 칠해지며, 읽던 문단을 그대로 터미널의 Claude Code에 넘깁니다.">
 <link rel="icon" href="icon.png">
 <meta property="og:title" content="Mac Commander">
-<meta property="og:description" content="Finder와 문서 뷰어를 한 창에 합친 macOS 파일 매니저.">
+<meta property="og:description" content="AI 코딩 시대의 문서 작업대 — 프로젝트 폴더의 마크다운을 터미널 옆에서 바로 읽는 macOS 앱.">
 <meta property="og:image" content="icon.png">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -115,6 +115,20 @@ a:hover{text-decoration:underline}
 .tree li.sel{background:var(--select-bg);color:var(--select-fg)}
 .tree li.sel .file,.tree li.sel .guide,.tree li.sel .dim{color:var(--select-fg)}
 .tree li.sel::after{content:'◄';margin-left:auto;padding-left:10px;font-size:11px}
+/* 앱 트리의 최근 변경 점·git 상태 글자를 그대로 옮긴 표시 */
+.tree .marks{margin-left:auto;padding-left:10px;display:flex;gap:6px;align-items:center;font-size:11px}
+.tree li.sel:has(.marks)::after{margin-left:0}
+.tree .git-m,.tree .dir.git-m{color:var(--amber)}
+.tree .git-u{color:var(--accent)}
+.tree .chg{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block}
+.tree .chg.dir{background:none;border:1.2px solid var(--accent)}
+.tree li.sel .git-m,.tree li.sel .git-u{color:var(--select-fg)}
+.tree li.sel .chg{background:var(--select-fg)}
+.listing .ds code{font-family:var(--mono);font-size:.92em;color:var(--accent)}
+.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+.flow div{border:1px solid var(--divider);padding:14px 16px;font-size:13px;line-height:1.65;color:var(--muted)}
+.flow b{display:block;color:var(--text);font-weight:500;margin-bottom:6px}
+.flow .k{font-family:var(--mono);font-size:.85em;color:var(--accent)}
 .tree .status{
   margin-top:auto;border-top:1px solid var(--divider);
   padding:6px 12px;font-size:11.5px;color:var(--muted);
@@ -439,7 +453,7 @@ footer .sp{margin-left:auto}
   .hero .tree{border-right:0;border-bottom:1px solid var(--divider)}
   .hero .doc{padding:30px 22px 26px}
   .keys{grid-template-columns:1fr}
-  .split,.dl,.sup{grid-template-columns:1fr}
+  .split,.dl,.sup,.flow{grid-template-columns:1fr}
   .sup .card-embed{height:225px}
   .dl .art{order:-1}
   .dl .art img{width:104px;height:104px}
@@ -475,31 +489,31 @@ footer .sp{margin-left:auto}
 
   <!-- ── 소개 ─────────────────────────────────────── -->
   <section class="panel" id="intro">
-    <div class="bar"><b>~/documents</b><span>— 마크다운 작업 폴더</span><span class="count">파일 7개</span></div>
+    <div class="bar"><b>~/my-app</b><span>— AI가 문서를 고치고 있는 프로젝트 폴더</span><span class="count">파일 8개</span></div>
     <div class="hero">
       <div class="tree">
         <ul>
-          <li style="--i:0"><span class="guide">▾ </span><span class="dir">design</span></li>
-          <li style="--i:1"><span class="guide">│ ├ </span><span class="file">design-tokens.md</span></li>
-          <li style="--i:2"><span class="guide">│ └ </span><span class="file">visual-style.md</span></li>
-          <li style="--i:3"><span class="guide">▾ </span><span class="dir">planning</span></li>
-          <li style="--i:4"><span class="guide">│ ├ </span><span class="file">컨셉.md</span></li>
-          <li style="--i:5"><span class="guide">│ └ </span><span class="file">로드맵.md</span></li>
-          <li style="--i:6" class="sel"><span class="guide">  </span><span class="file">Mac Commander.md</span></li>
-          <li style="--i:7"><span class="guide">  </span><span class="file">README.md</span></li>
-          <li style="--i:8"><span class="guide">  </span><span class="file">회의록-0729.md</span></li>
+          <li style="--i:0"><span class="guide">▾ </span><span class="dir git-m">docs</span><span class="marks"><span class="chg dir"></span></span></li>
+          <li style="--i:1"><span class="guide">│ ├ </span><span class="file">api-spec.md</span></li>
+          <li style="--i:2" class="sel"><span class="guide">│ ├ </span><span class="file">plan.md</span><span class="marks"><span class="git-m">M</span><span class="chg"></span></span></li>
+          <li style="--i:3"><span class="guide">│ └ </span><span class="file">decisions.md</span><span class="marks"><span class="git-u">U</span><span class="chg"></span></span></li>
+          <li style="--i:4"><span class="guide">▸ </span><span class="dir">src</span></li>
+          <li style="--i:5"><span class="guide">  </span><span class="file">CLAUDE.md</span></li>
+          <li style="--i:6"><span class="guide">  </span><span class="file">README.md</span><span class="marks"><span class="git-m">M</span></span></li>
+          <li style="--i:7"><span class="guide">  </span><span class="file">로드맵.md</span></li>
         </ul>
-        <div class="status"><span class="on">MD</span><span>·</span><span>정렬: 이름순</span></div>
+        <div class="status"><span class="on">MD</span><span>·</span><span>● 방금 바뀜</span><span>·</span><span>M 수정됨</span></div>
       </div>
 
       <div class="doc">
         <h1>Mac&nbsp;Commander<span class="cursor"></span></h1>
         <div class="rule"></div>
-        <p class="lede"><em>Finder</em>와 <em>문서 뷰어</em>를 한 창에 합친 macOS 앱.
-          왼쪽 트리에서 고르면, 오른쪽 패널에서 바로 읽는다.</p>
-        <p class="sub">파일을 옮기고 이름을 바꾸는 파일 관리자와, 마크다운·PDF·이미지·Office 문서를 여는 뷰어가
-          한 창에 있습니다. 파일마다 다른 앱을 띄울 필요 없이 같은 창에서 고르고, 읽고, 고칩니다.
-          조작은 Total Commander처럼 키보드 중심입니다.</p>
+        <p class="lede"><em>AI 코딩 시대</em>의 문서 작업대.
+          프로젝트 폴더의 마크다운을, 터미널 옆에서 바로 읽는다.</p>
+        <p class="sub">Claude Code 같은 AI 도구는 계획서·명세·회의록을 마크다운으로 쏟아 냅니다.
+          Mac Commander는 그 폴더를 열어 두고 터미널을 옆에 붙인 채 읽는 앱입니다.
+          AI가 고친 파일은 트리에 점이 찍히고, 문서에서는 바뀐 문단이 칠해지고,
+          읽던 문단은 단축키 한 번으로 터미널 입력줄에 넘어갑니다.</p>
         <div class="cta">
           <a class="btn" href="https://github.com/codegeargit/mac-commander-releases/releases/download/v1.8/MacCommander-1.8.dmg">
             1.8 다운로드 (.dmg) <span class="kbd">F5</span>
@@ -515,6 +529,39 @@ footer .sp{margin-left:auto}
           <!-- 다운로드 수는 일정 기준을 넘을 때만 스크립트가 채워 넣는다. -->
           <span id="dlcount" hidden></span>
         </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AI 작업 흐름 ─────────────────────────────── -->
+  <section class="panel" id="terminal">
+    <div class="bar"><b>~/AI 작업</b><span>— 시키고, 바뀐 곳을 읽고, 다시 시킨다</span></div>
+    <div class="pad">
+      <div class="split">
+        <div class="term">
+          <div class="tbar"><i></i><i></i><i></i> my-app — claude</div>
+          <div class="body"><span class="p">$</span> mcom docs/plan.md
+<span class="o">→ Mac Commander가 열리고 plan.md가 뜬다</span>
+
+<span class="p">$</span> claude
+<span class="p">&gt;</span> /Users/you/my-app/docs/plan.md:12-18
+<span class="o">&gt; 2단계에서 캐시를 먼저 붙인다.</span>
+<span class="o">&gt; 실패하면 원본으로 되돌린다.</span>
+이 부분을 테스트 계획까지 넣어서 다시 써 줘<span class="caret"></span></div>
+        </div>
+        <div class="prose">
+          <p><span class="k">⌃`</span> 로 창 옆에 터미널을 붙이고, 버튼 하나로 그 폴더에서
+            <strong>Claude Code</strong>를 띄웁니다. cd 할 일이 없습니다.</p>
+          <p>AI가 파일을 고치면 트리에 <strong>점</strong>이 찍히고, 열어 둔 문서는 저절로 다시 그려지면서
+            <strong>바뀐 문단이 칠해집니다.</strong> 무엇이 바뀌었는지 찾아 헤맬 필요가 없습니다.</p>
+          <p>고칠 곳을 골라 <span class="k">⌥⌘↩</span> 를 누르면 그 문단이 출처 줄과 함께
+            터미널 입력줄로 넘어갑니다. 뒤에 지시만 이어 쓰면 됩니다.</p>
+        </div>
+      </div>
+      <div class="flow">
+        <div><b>최근 변경 표시</b>방금 바뀐 파일에는 진한 점, 10분 안에 바뀐 파일에는 흐린 점. 접힌 폴더에도 안쪽이 바뀌었다고 표시됩니다.</div>
+        <div><b>바뀐 곳 칠하기</b>다시 읽은 문서에서 새로 생기거나 고쳐진 문단에 막대를, 지워진 자리에 점선을 긋습니다. <span class="k">↓</span> 버튼으로 차례로 옮겨 다닙니다.</div>
+        <div><b>git 상태</b>저장소 안이면 파일 이름이 상태 색으로 칠해지고 끝에 <span class="k">M</span>·<span class="k">A</span>·<span class="k">U</span>가 붙습니다. 커밋하면 바로 사라집니다.</div>
       </div>
     </div>
   </section>
@@ -646,10 +693,12 @@ footer .sp{margin-left:auto}
 
   <!-- ── 기능 ─────────────────────────────────────── -->
   <section class="panel" id="features">
-    <div class="bar"><b>~/기능</b><span>— 파일 매니저가 하는 일</span><span class="count">16개 항목</span></div>
+    <div class="bar"><b>~/기능</b><span>— 할 수 있는 일</span><span class="count">22개 항목</span></div>
     <div class="listing" style="padding-top:12px">
       <div class="head"><span>이름</span><span>단축키</span><span>설명</span></div>
       <div class="row"><span class="nm">폴더 열기</span><span class="ky">⌘O</span><span class="ds">폴더를 창에 떨어뜨려도 열립니다. 시작 화면에 최근 폴더가 남습니다.</span></div>
+      <div class="row"><span class="nm">터미널에서 열기</span><span class="ky">mcom</span><span class="ds">터미널에서 <code>mcom</code>은 지금 폴더를, <code>mcom plan.md</code>는 그 문서를 엽니다. 도움말 메뉴에서 한 번 설치합니다.</span></div>
+      <div class="row"><span class="nm">Finder에서 열기</span><span class="ky">다음으로 열기</span><span class="ds">마크다운 파일이나 폴더를 우클릭해 Mac Commander로 엽니다. 독 아이콘에 끌어 놓아도 됩니다.</span></div>
       <div class="row"><span class="nm">MD / ALL 보기</span><span class="ky">헤더 토글</span><span class="ds">MD는 뷰어로 열 수 있는 파일(마크다운·PDF·이미지·HTML·Office)만, ALL은 모든 파일을 보여줍니다. 이름·수정일·크기로 정렬합니다.</span></div>
       <div class="row"><span class="nm">빠른 열기</span><span class="ky">⌘P</span><span class="ds">파일 이름 일부만 쳐서 폴더 안의 파일을 바로 엽니다.</span></div>
       <div class="row"><span class="nm">본문 찾기</span><span class="ky">⇧⌘F · ⌘F</span><span class="ds">폴더 안 텍스트 파일의 내용을 줄 단위로 찾고, 고르면 그 문서에서 같은 말을 이어 찾습니다.</span></div>
@@ -664,6 +713,10 @@ footer .sp{margin-left:auto}
       <div class="row"><span class="nm">편집과 저장</span><span class="ky">⌘E · ⌘S</span><span class="ds">마크다운과 텍스트를 그 자리에서 고칩니다. 저장 안 된 문서는 표시가 붙습니다.</span></div>
       <div class="row"><span class="nm">터미널 패널</span><span class="ky">⌃`</span><span class="ds">트리에서 고른 폴더에서 셸이 열립니다. 창 오른쪽이나 아래에 붙입니다.</span></div>
       <div class="row"><span class="nm">자동 새로고침</span><span class="ky">자동</span><span class="ds">다른 앱에서 파일을 바꾸면 트리와 열린 문서가 알아서 갱신됩니다.</span></div>
+      <div class="row"><span class="nm">최근 변경 표시</span><span class="ky">자동</span><span class="ds">10분 안에 바뀐 파일과 폴더 끝에 점이 찍힙니다. 방금 바뀐 것은 진하게, 조금 지난 것은 흐리게.</span></div>
+      <div class="row"><span class="nm">바뀐 곳 칠하기</span><span class="ky">자동</span><span class="ds">열어 둔 문서가 바깥에서 고쳐지면 바뀐 문단과 지워진 자리를 표시하고, 개수와 이동 버튼을 띄웁니다.</span></div>
+      <div class="row"><span class="nm">git 상태</span><span class="ky">자동</span><span class="ds">저장소 안이면 수정(M)·추가(A)·추적 안 됨(U)을 이름 색과 글자로 보여 줍니다.</span></div>
+      <div class="row"><span class="nm">터미널로 보내기</span><span class="ky">⌥⌘↩</span><span class="ds">트리에서는 고른 파일 경로를, 뷰어에서는 선택한 글을 출처 줄과 함께 터미널 입력줄에 넣습니다.</span></div>
       <div class="row"><span class="nm">세션 복원</span><span class="ky">자동</span><span class="ds">열어둔 폴더와 문서, 두 번째 트리, 패널 폭, 터미널 위치를 다음 실행 때 되살립니다.</span></div>
     </div>
   </section>
@@ -864,28 +917,6 @@ footer .sp{margin-left:auto}
     </div>
   </section>
 
-  <!-- ── 터미널 ───────────────────────────────────── -->
-  <section class="panel" id="terminal">
-    <div class="bar"><b>~/터미널</b><span>— 창을 옮겨 다니지 않아도 되는 이유</span></div>
-    <div class="pad">
-      <div class="split">
-        <div class="term">
-          <div class="tbar"><i></i><i></i><i></i> documents — zsh</div>
-          <div class="body"><span class="p">$</span> pwd
-<span class="o">/Users/you/documents/planning</span>
-
-<span class="p">$</span> claude<span class="caret"></span></div>
-        </div>
-        <div class="prose">
-          <p><span class="k">⌃`</span> 를 누르면 창 오른쪽에 터미널이 열립니다(아래로 옮길 수도 있습니다).
-            트리에서 고른 폴더가 곧 작업 디렉터리라서, <strong>cd 할 일이 없습니다.</strong></p>
-          <p>버튼 하나로 그 폴더에서 <strong>Claude Code</strong>를 띄울 수 있습니다.
-            문서를 읽다가, 고치다가, 바로 옆에서 명령을 실행하는 흐름이 한 창 안에서 끝납니다.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ── 단축키 ───────────────────────────────────── -->
   <section class="panel" id="shortcuts">
     <div class="bar"><b>~/단축키</b><span>— 손을 키보드에 두는 쪽이 빠릅니다</span></div>
@@ -1015,9 +1046,9 @@ footer .sp{margin-left:auto}
 
 <nav class="fbar" aria-label="펑션 키 탐색">
   <a href="#intro" data-fkey="F1"><span class="n">1</span>소개</a>
-  <a href="#features" data-fkey="F2"><span class="n">2</span>기능</a>
-  <a href="#viewer" data-fkey="F3"><span class="n">3</span>뷰어</a>
-  <a href="#terminal" data-fkey="F4"><span class="n">4</span>터미널</a>
+  <a href="#terminal" data-fkey="F2"><span class="n">2</span>AI 작업</a>
+  <a href="#features" data-fkey="F3"><span class="n">3</span>기능</a>
+  <a href="#viewer" data-fkey="F4"><span class="n">4</span>뷰어</a>
   <a href="#download" data-fkey="F5"><span class="n">5</span>다운로드</a>
   <a href="#shortcuts" data-fkey="F6"><span class="n">6</span>단축키</a>
   <a href="https://github.com/codegeargit/mac-commander-releases/releases" data-fkey="F7"><span class="n">7</span>릴리스</a>
