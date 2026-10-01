@@ -136,6 +136,12 @@ struct DocumentDetailView: View {
                     findRequest: panel.findRequest,
                     onFindResult: { found in
                         store.reportFindResult(found: found, panel: panelIndex)
+                    },
+                    // 글을 고르면 옆에 뜨는 보내기 버튼. 보낼 터미널이 열려 있을 때만 띄운다.
+                    showsSendButton: store.showTerminal,
+                    sendLabel: loc.string(.sendToTerminal),
+                    onSendSelection: { text in
+                        Task { @MainActor in store.sendSelectionToTerminal(text, panel: panelIndex) }
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

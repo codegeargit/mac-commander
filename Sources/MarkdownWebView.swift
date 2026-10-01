@@ -35,6 +35,12 @@ struct MarkdownWebView: View {
     let findRequest: FindRequest?
     /// 검색 결과 유무를 찾기 바에 알린다.
     let onFindResult: (Bool) -> Void
+    /// 글을 고르면 그 옆에 "터미널로 보내기" 버튼을 띄울지(터미널 패널이 열려 있을 때만).
+    let showsSendButton: Bool
+    /// 보내기 버튼 툴팁·우클릭 메뉴 항목 이름.
+    let sendLabel: String
+    /// 보내기 버튼·우클릭 메뉴로 보낼 때 호출. 고른 글이 없으면 빈 문자열이 온다.
+    let onSendSelection: (String) -> Void
 
     var body: some View {
         MarkdownWebViewRepresentable(
@@ -47,7 +53,10 @@ struct MarkdownWebView: View {
             onScroll: onScroll,
             onOpenFile: onOpenFile,
             findRequest: findRequest,
-            onFindResult: onFindResult
+            onFindResult: onFindResult,
+            showsSendButton: showsSendButton,
+            sendLabel: sendLabel,
+            onSendSelection: onSendSelection
         )
     }
 }
@@ -64,6 +73,9 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
     let onOpenFile: (URL) -> Void
     let findRequest: FindRequest?
     let onFindResult: (Bool) -> Void
+    let showsSendButton: Bool
+    let sendLabel: String
+    let onSendSelection: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -79,8 +91,9 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
             context.coordinator.localResourceHandler,
             forURLScheme: MarkdownLocalResource.scheme)
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = MarkdownWKWebView(frame: .zero, configuration: config)
         syncCallbacks(context.coordinator)
+        syncSendMenu(webView)
         webView.navigationDelegate = context.coordinator
         // 트랙패드 두 손가락 핀치 확대(WKWebView 기본값은 꺼져 있다).
         // 목차를 포함해 화면 전체를 그대로 늘리는 합성 확대라 손가락을 그대로 따라온다.
@@ -97,6 +110,7 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {
         // 콜백은 매 갱신마다 새로 만들어지므로(패널·문서를 캡처) 항상 최신으로 바꿔 둔다.
         syncCallbacks(context.coordinator)
+        if let webView = webView as? MarkdownWKWebView { syncSendMenu(webView) }
         // 내용·테마가 바뀌면 다시 로드한다. 같은 값이면 건너뛴다.
         let key = context.coordinator.key(content: content, isDark: isDark, colors: colors)
         if key != context.coordinator.lastKey {
@@ -106,12 +120,21 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
             context.coordinator.applyFontSize(fontSize, in: webView)
         }
         context.coordinator.runFindIfNeeded(findRequest, in: webView)
+        context.coordinator.applySendButton(in: webView)
     }
 
     private func syncCallbacks(_ coordinator: Coordinator) {
         coordinator.onOpenFile = onOpenFile
         coordinator.onScroll = onScroll
         coordinator.onFindResult = onFindResult
+        coordinator.onSendSelection = onSendSelection
+        coordinator.showsSendButton = showsSendButton
+        coordinator.sendLabel = sendLabel
+    }
+
+    private func syncSendMenu(_ webView: MarkdownWKWebView) {
+        webView.sendMenuTitle = sendLabel
+        webView.onSendSelection = onSendSelection
     }
 
     private func load(_ webView: WKWebView, context: Context) {
@@ -159,6 +182,13 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         var onScroll: ((Double) -> Void)?
         /// 검색 결과 유무를 찾기 바에 알리는 콜백.
         var onFindResult: ((Bool) -> Void)?
+        /// 보내기 버튼으로 고른 글을 터미널에 넘기는 콜백.
+        var onSendSelection: ((String) -> Void)?
+        /// 보내기 버튼을 띄울지와 툴팁 문구. 문서를 다시 그리지 않고 JS로만 바꾼다.
+        var showsSendButton = false
+        var sendLabel = ""
+        /// 마지막으로 JS에 알린 보내기 버튼 상태(같으면 다시 실행하지 않는다).
+        private var appliedSendState: String?
         /// 마지막으로 실행한 검색 요청(같은 요청을 두 번 실행하지 않기 위해).
         private var lastFindRequest: FindRequest?
         /// 렌더가 끝나기 전에 들어온 검색 요청. 본문 검색 결과에서 문서를 열면
@@ -170,6 +200,18 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         /// 문서를 다시 로드할 때 호출 — 렌더 완료 신호를 다시 기다린다.
         func documentWillReload() {
             isDocumentReady = false
+            appliedSendState = nil   // 새 페이지는 버튼 상태를 모른다
+        }
+
+        /// 보내기 버튼 표시 여부·툴팁을 웹뷰에 알린다. 페이지가 다시 그려지면 ready 뒤에 다시 알린다.
+        func applySendButton(in webView: WKWebView) {
+            guard isDocumentReady else { return }
+            let state = "\(showsSendButton)|\(sendLabel)"
+            guard state != appliedSendState else { return }
+            appliedSendState = state
+            webView.evaluateJavaScript(
+                "window.mcSetSend && window.mcSetSend(\(showsSendButton), \(MarkdownDocument.jsonEncoded(sendLabel)));",
+                completionHandler: nil)
         }
 
         /// 새 검색 요청이면 웹뷰 검색을 실행한다.
@@ -205,7 +247,10 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         /// JS가 본문 파싱을 끝냈다고 알려왔을 때.
         fileprivate func markDocumentReady(in webView: WKWebView?) {
             isDocumentReady = true
-            if let webView { runPendingFind(in: webView) }
+            if let webView {
+                runPendingFind(in: webView)
+                applySendButton(in: webView)
+            }
         }
 
         /// 문서를 다시 그려야 하는지 판단하는 키. 글자 크기는 CSS만 바꿔 처리하므로
@@ -285,6 +330,35 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
             if body["ready"] as? Bool == true {
                 markDocumentReady(in: message.webView)
             }
+            if let text = body["sendSelection"] as? String {
+                onSendSelection?(text)
+            }
+        }
+    }
+}
+
+// MARK: - 우클릭 메뉴
+
+/// 마크다운 뷰어 웹뷰. 우클릭 메뉴 맨 위에 "터미널로 보내기"를 넣는다.
+/// 고른 글이 있으면 그 글을, 없으면 문서 경로를 보낸다(⌥⌘↩와 같다).
+final class MarkdownWKWebView: WKWebView {
+    var sendMenuTitle = ""
+    var onSendSelection: ((String) -> Void)?
+
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        super.willOpenMenu(menu, with: event)
+        guard onSendSelection != nil, !sendMenuTitle.isEmpty else { return }
+        let item = NSMenuItem(title: sendMenuTitle, action: #selector(sendFromMenu), keyEquivalent: "\r")
+        // 메뉴가 열려 있는 동안만 먹는 단축키라 표시용이다. 평소 단축키를 익히게 한다.
+        item.keyEquivalentModifierMask = [.option, .command]
+        item.target = self
+        menu.insertItem(.separator(), at: 0)
+        menu.insertItem(item, at: 0)
+    }
+
+    @objc private func sendFromMenu() {
+        evaluateJavaScript("window.getSelection().toString()") { [weak self] result, _ in
+            self?.onSendSelection?((result as? String) ?? "")
         }
     }
 }
@@ -366,6 +440,71 @@ enum MarkdownDocument {
               report({ scroll: max > 0 ? window.pageYOffset / max : 0 });
             }, 120);
           }, { passive: true });
+
+          // 글을 고르면 선택 끝 옆에 "터미널로 보내기" 버튼을 띄운다(⌥⌘↩와 같은 동작).
+          // 터미널 패널이 열려 있을 때만 앱이 켠다. 그냥 복사하려던 사람을 방해하지 않게
+          // 드래그가 끝난 뒤에만 띄우고, 스크롤·Esc·복사·선택 해제 때 걷어 낸다.
+          var sendEnabled = false, sendLabel = "", sendButton = null;
+          function selectedText() {
+            const sel = window.getSelection();
+            return sel && !sel.isCollapsed ? sel.toString() : "";
+          }
+          function hideSendButton() {
+            if (sendButton) sendButton.classList.remove("show");
+          }
+          window.mcSetSend = function (enabled, label) {
+            sendEnabled = enabled;
+            sendLabel = label + "  ⌥⌘↩";
+            if (sendButton) { sendButton.title = sendLabel; sendButton.setAttribute("aria-label", label); }
+            if (!enabled) hideSendButton();
+          };
+          function makeSendButton() {
+            const b = document.createElement("button");
+            b.id = "mc-send";
+            b.type = "button";
+            b.title = sendLabel;
+            b.setAttribute("aria-label", sendLabel);
+            b.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">' +
+              '<path d="M3 4.5 6.5 8 3 11.5" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+              'stroke-linecap="round" stroke-linejoin="round"/>' +
+              '<path d="M8.5 11.5H13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+            // 누르는 순간 선택이 풀리지 않게 한다.
+            b.addEventListener("mousedown", function (ev) { ev.preventDefault(); ev.stopPropagation(); });
+            b.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              const text = selectedText();
+              hideSendButton();
+              if (text.trim()) report({ sendSelection: text });
+            });
+            document.body.appendChild(b);
+            return b;
+          }
+          document.addEventListener("mouseup", function (ev) {
+            if (sendButton && sendButton.contains(ev.target)) return;
+            // 클릭 한 번으로 선택이 풀리는 것은 mouseup 직후에 반영된다.
+            setTimeout(function () {
+              const sel = window.getSelection();
+              if (!sendEnabled || !selectedText().trim() || sel.rangeCount === 0) { hideSendButton(); return; }
+              // 선택 끝 줄. 다음 블록 맨 앞에서 끝나면 폭 0인 사각형이 끼므로 걸러 낸다.
+              const rects = Array.from(sel.getRangeAt(0).getClientRects()).filter(function (r) { return r.width > 0; });
+              const last = rects[rects.length - 1];
+              if (!last) { hideSendButton(); return; }
+              sendButton = sendButton || makeSendButton();
+              const size = 26;
+              const left = Math.min(last.right + 6, window.innerWidth - size - 8);
+              const top = Math.min(last.bottom + 4, window.innerHeight - size - 8);
+              sendButton.style.left = Math.max(8, left) + "px";
+              sendButton.style.top = Math.max(8, top) + "px";
+              sendButton.classList.add("show");
+            }, 0);
+          });
+          document.addEventListener("selectionchange", function () {
+            if (!selectedText()) hideSendButton();
+          });
+          document.addEventListener("keydown", function (ev) {
+            if (ev.key === "Escape" || (ev.metaKey && ev.key === "c")) hideSendButton();
+          });
+          window.addEventListener("scroll", hideSendButton, { passive: true });
 
           // 이전 원문과 지금 블록 목록을 블록 원문(raw) 단위로 비교한다(LCS).
           // 지금 목록에서 공통 부분에 들지 못한 블록은 "바뀜", 이전 목록에서 빠진 블록은
@@ -657,7 +796,7 @@ enum MarkdownDocument {
     }
 
     /// 문자열을 JS에 안전하게 주입할 JSON 리터럴로 인코딩한다.
-    private static func jsonEncoded(_ s: String) -> String {
+    static func jsonEncoded(_ s: String) -> String {
         // JSONEncoder는 최상위 문자열도 인코딩한다(withoutEscapingSlashes로 슬래시 보존).
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
@@ -890,6 +1029,27 @@ enum MarkdownDocument {
           border-radius: 999px;
         }
         #mc-changes button:hover { background: \(codeInlineBg); }
+        #mc-send {
+          position: fixed;
+          z-index: 11;
+          width: 26px;
+          height: 26px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border: 1px solid \(accent);
+          border-radius: 7px;
+          background: \(panelBg);
+          color: \(accent);
+          cursor: pointer;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+          opacity: 0;
+          transform: translateY(3px);
+          pointer-events: none;
+          transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+        }
+        #mc-send.show { opacity: 1; transform: none; pointer-events: auto; }
+        #mc-send:hover { background: \(accent); color: \(panelBg); }
 
         /* 패널이 좁으면 본문을 살려야 하므로 목차를 접는다. */
         @media (max-width: \(readingWidth + tocWidth + 80)px) {

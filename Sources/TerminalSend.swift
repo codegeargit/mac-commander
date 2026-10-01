@@ -15,12 +15,7 @@ extension WorkspaceStore {
         if case .panel(let index) = focus, let url = panels[safe: index]?.fileURL {
             let source = panels[index].content
             ViewerSelection.read { [weak self] selection in
-                guard let self else { return }
-                if let selection, !selection.text.isEmpty {
-                    self.insertIntoTerminal(Self.quote(selection, from: url, source: source))
-                } else {
-                    self.insertIntoTerminal(Self.shellQuoted(url.path) + " ")
-                }
+                self?.insertSelection(selection, from: url, source: source)
             }
             return
         }
@@ -33,6 +28,21 @@ extension WorkspaceStore {
     func sendPathsToTerminal(for node: FileNode, in pane: TreePane) {
         let urls = pane.markedURLs.contains(node.url) ? pane.actionTargetURLs : [node.url]
         insertIntoTerminal(urls.map { Self.shellQuoted($0.path) }.joined(separator: " ") + " ")
+    }
+
+    /// 마크다운 뷰어의 보내기 버튼·우클릭 메뉴용: 그 패널에서 고른 글(비었으면 문서 경로)을 보낸다.
+    func sendSelectionToTerminal(_ text: String, panel index: Int) {
+        guard let url = panels[safe: index]?.fileURL else { return }
+        insertSelection(text.isEmpty ? nil : ViewerSelection(text: text),
+                        from: url, source: panels[index].content)
+    }
+
+    private func insertSelection(_ selection: ViewerSelection?, from url: URL, source: String?) {
+        if let selection, !selection.text.isEmpty {
+            insertIntoTerminal(Self.quote(selection, from: url, source: source))
+        } else {
+            insertIntoTerminal(Self.shellQuoted(url.path) + " ")
+        }
     }
 
     private func insertIntoTerminal(_ text: String) {
