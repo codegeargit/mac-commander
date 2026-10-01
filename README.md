@@ -4,6 +4,8 @@
 
 Claude Code 같은 AI 도구가 쏟아 내는 계획서·명세·회의록을, 폴더 트리와 렌더링된 뷰어와 내장 터미널을 한 창에 두고 읽습니다. AI가 고친 파일은 트리에 표시되고, 열어 둔 문서에서는 바뀐 문단이 칠해지며, 읽던 문단은 단축키 한 번으로 터미널의 AI에게 다시 넘어갑니다. SwiftUI로 작성한 네이티브 앱입니다.
 
+![AI가 문서를 고치면 트리에 점이 찍히고, 바뀐 문단이 칠해지고, 고른 문단을 버튼으로 터미널에 넘기는 시연](site/media/ai-workflow.gif)
+
 *A document workbench for the AI coding era: read the Markdown in your project folder right next to the terminal. Files the AI just touched are marked in the tree, changed paragraphs are highlighted in the viewer, and any passage goes back to Claude Code with one shortcut. Open source under GPLv3.*
 
 **➡️ [최신 버전 다운로드](https://github.com/codegeargit/mac-commander-releases/releases/latest)** · `brew install --cask codegeargit/tap/mac-commander` · [소개 페이지](https://maccommander.com/)
@@ -15,11 +17,12 @@ AI 작업 흐름
 - **최근 변경 표시** — 10분 안에 바뀐 파일·폴더 끝에 점(방금 바뀐 것은 진하게). 접힌 폴더도 안쪽 변경을 알려 줌
 - **바뀐 곳 칠하기** — 열어 둔 문서가 바깥에서 고쳐지면 바뀐 문단과 지워진 자리를 표시하고, "바뀐 곳 N ↓" 버튼으로 차례로 이동
 - **git 상태** — 저장소 안이면 수정(M)·추가(A)·추적 안 됨(U)을 이름 색과 글자로 표시
-- **터미널로 보내기(⌥⌘↩)** — 트리에서는 고른 경로를, 뷰어에서는 선택한 글을 `경로:줄` 출처와 함께 터미널 입력줄에 넣음
+- **터미널로 보내기(⌥⌘↩)** — 트리에서는 고른 경로를, 뷰어에서는 선택한 글을 `경로:줄` 출처와 함께 터미널 입력줄에 넣음. 마크다운 뷰어에서는 글을 고르면 옆에 뜨는 버튼이나 우클릭 메뉴로도 보냄
 - **`mcom` 명령** — 터미널에서 `mcom`(지금 폴더)·`mcom plan.md`(그 문서)로 열기. 도움말 ▸ 명령줄 도구(mcom) 설치…
 - **Finder에서 열기** — 마크다운 파일·폴더의 "다음으로 열기"에 표시
 
-읽기와 파일 관리
+<details>
+<summary><b>읽기와 파일 관리</b> — 뷰어 분할, 듀얼 트리, 수식·다이어그램, 여러 문서 형식 등</summary>
 
 - 폴더 트리와 문서 뷰어를 나란히 두는 2-pane 화면, 뷰어 패널 최대 3개 분할
 - Total Commander식 듀얼 트리(⇧⌘D) — F5·F6으로 반대편 트리에 복사·이동, 하단 F키 바, ⌥⌘→/⌥⌘← 같은 위치 열기, Tab으로 트리·뷰어 포커스 이동
@@ -28,6 +31,8 @@ AI 작업 흐름
 - 내장 터미널 패널과 Claude Code 실행
 - ⌘P 빠른 열기, ⇧⌘F 폴더 본문 검색, 멀티 리네임
 - 테마 4종(후원자 테마 8종 별도), 한국어 · 영어, Sparkle 자동 업데이트
+
+</details>
 
 ## 설치
 

@@ -125,6 +125,8 @@ a:hover{text-decoration:underline}
 .tree li.sel .git-m,.tree li.sel .git-u{color:var(--select-fg)}
 .tree li.sel .chg{background:var(--select-fg)}
 .listing .ds code{font-family:var(--mono);font-size:.92em;color:var(--accent)}
+.demo{margin:0 0 22px;border:1px solid var(--divider);background:var(--page);line-height:0}
+.demo video{display:block;width:100%;height:auto}
 .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
 .flow div{border:1px solid var(--divider);padding:14px 16px;font-size:13px;line-height:1.65;color:var(--muted)}
 .flow b{display:block;color:var(--text);font-weight:500;margin-bottom:6px}
@@ -537,6 +539,11 @@ footer .sp{margin-left:auto}
   <section class="panel" id="terminal">
     <div class="bar"><b>~/AI 작업</b><span>— 시키고, 바뀐 곳을 읽고, 다시 시킨다</span></div>
     <div class="pad">
+      <figure class="demo">
+        <video src="media/ai-workflow.mp4" poster="media/ai-workflow-poster.jpg" width="1920" height="1200"
+          autoplay muted loop playsinline preload="metadata"
+          aria-label="AI가 문서를 고치면 트리에 점이 찍히고, 바뀐 문단이 칠해지고, 고른 문단을 버튼으로 터미널에 넘기는 18초 시연"></video>
+      </figure>
       <div class="split">
         <div class="term">
           <div class="tbar"><i></i><i></i><i></i> my-app — claude</div>
@@ -554,7 +561,7 @@ footer .sp{margin-left:auto}
             <strong>Claude Code</strong>를 띄웁니다. cd 할 일이 없습니다.</p>
           <p>AI가 파일을 고치면 트리에 <strong>점</strong>이 찍히고, 열어 둔 문서는 저절로 다시 그려지면서
             <strong>바뀐 문단이 칠해집니다.</strong> 무엇이 바뀌었는지 찾아 헤맬 필요가 없습니다.</p>
-          <p>고칠 곳을 골라 <span class="k">⌥⌘↩</span> 를 누르면 그 문단이 출처 줄과 함께
+          <p>고칠 곳을 골라 옆에 뜨는 버튼을 누르거나 <span class="k">⌥⌘↩</span> 를 누르면 그 문단이 출처 줄과 함께
             터미널 입력줄로 넘어갑니다. 뒤에 지시만 이어 쓰면 됩니다.</p>
         </div>
       </div>
@@ -1086,6 +1093,10 @@ footer .sp{margin-left:auto}
   var bar = document.querySelector('.fbar');
   var links = Array.prototype.slice.call(bar.querySelectorAll('a'));
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 움직임을 줄인 사용자에게는 시연 영상을 자동 재생하지 않고 직접 틀게 한다.
+  if (reduce) document.querySelectorAll('.demo video').forEach(function (v) {
+    v.removeAttribute('autoplay'); v.pause(); v.controls = true;
+  });
 
   // 펑션 키로 섹션 이동 — 앱의 F키 바와 같은 규칙.
   document.addEventListener('keydown', function (e) {

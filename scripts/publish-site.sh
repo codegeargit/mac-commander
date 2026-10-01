@@ -67,6 +67,8 @@ git clone --depth 1 "git@github.com:$RELEASE_REPO.git" "$WORK/repo" 2>/dev/null
 mkdir -p "$WORK/repo/docs"
 cp "$WORK/site/index.html" "$WORK/site/privacy.html" "$WORK/site/terms.html" \
    "$WORK/site/icon.png" "$WORK/site/CNAME" "$WORK/repo/docs/"
+# 시연 영상·포스터 등 페이지가 쓰는 미디어.
+rsync -a --delete "$WORK/site/media/" "$WORK/repo/docs/media/"
 
 cd "$WORK/repo"
 git add docs   # 새 파일은 add 전에는 diff에 안 잡히므로 먼저 스테이징한다
