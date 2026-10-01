@@ -1,0 +1,29 @@
+#!/bin/sh
+# mcom — 터미널에서 Mac Commander로 폴더나 파일을 연다.
+#
+#   mcom            지금 폴더를 연다
+#   mcom docs       docs 폴더를 연다
+#   mcom plan.md    plan.md가 든 폴더를 열고 그 문서를 뷰어에 띄운다
+#
+# 앱의 도움말 ▸ 명령줄 도구 설치…가 /usr/local/bin/mcom 에 이 파일의 링크를 만든다.
+
+case "$1" in
+  -h|--help)
+    sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
+esac
+
+target="${1:-.}"
+if [ ! -e "$target" ]; then
+  echo "mcom: '$target' 경로가 없습니다 (no such file or directory)" >&2
+  exit 1
+fi
+
+if [ -d "$target" ]; then
+  path="$(cd "$target" && pwd)"
+else
+  path="$(cd "$(dirname "$target")" && pwd)/$(basename "$target")"
+fi
+
+exec open -b ai.codegear.MacCommander "$path"

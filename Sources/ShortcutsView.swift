@@ -26,6 +26,7 @@ struct ShortcutsView: View {
                 Row(keys: "⌘⌫", desc: .scDelete),
                 Row(keys: "⌘O", desc: .scOpenFolder),
                 Row(keys: "⌘T", desc: .scOpenInTerminal),
+                Row(keys: "⌥⌘↩", desc: .scSendToTerminal),
                 Row(keys: "⌘R", desc: .scMultiRename),
                 Row(keys: "⌘↑", desc: .scGoParent),
                 Row(keys: "⇧⌘G", desc: .scGoToFolder),

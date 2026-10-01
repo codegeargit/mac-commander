@@ -120,11 +120,20 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         // 새로 만드는 HTML에는 지금 글자 크기가 이미 들어간다(아래 MarkdownDocument.html).
         context.coordinator.lastFontSize = fontSize
         context.coordinator.documentWillReload()
+        // 같은 문서의 내용만 바뀌었으면(AI 도구 등 다른 앱이 파일을 고쳐 다시 읽은 경우)
+        // 이전 원문을 함께 넘겨 바뀐 블록을 칠하게 한다. 편집 모드는 이 웹뷰를 아예 내리므로
+        // 내가 직접 고친 내용은 여기로 오지 않는다.
+        let coordinator = context.coordinator
+        let previous = coordinator.lastFileURL == fileURL && coordinator.lastContent != content
+            ? coordinator.lastContent : nil
+        coordinator.lastFileURL = fileURL
+        coordinator.lastContent = content
         // 폰트·테마를 바꾸거나 편집을 마치고 돌아올 때마다 문서를 통째로 다시 그린다.
         // 읽던 위치를 함께 넘겨 문서 처음으로 튀지 않게 한다.
         let html = MarkdownDocument.html(
             content: content, fontSize: fontSize, colors: colors, isDark: isDark,
-            scrollRatio: scrollRatio())
+            scrollRatio: scrollRatio(), previousContent: previous,
+            changeLabels: MarkdownDocument.ChangeLabels.current)
         // baseURL: 이미지·링크 상대 경로 해석용 문서 폴더. 자산은 HTML에 인라인되므로
         // 자산 로딩엔 baseURL이 필요 없다. file:// 대신 mdlocal:// 스킴을 쓰는 이유는
         // MarkdownLocalResource 주석 참고 — file://이면 이미지가 로드되지 않는다.
@@ -139,6 +148,9 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
         /// 웹뷰 설정이 붙들고 있으므로 코디네이터와 수명을 같이 한다.
         let localResourceHandler = MarkdownLocalResourceHandler()
         var lastKey: String = ""
+        /// 마지막으로 그린 문서와 원문. 같은 문서의 내용이 바뀌었을 때 바뀐 곳을 칠하는 데 쓴다.
+        var lastFileURL: URL?
+        var lastContent: String?
         /// 마지막으로 웹뷰에 반영한 본문 글자 크기(같으면 JS를 다시 실행하지 않는다).
         var lastFontSize: CGFloat = 0
         /// 로컬 문서 링크를 뷰어에서 열기 위한 콜백(패널을 캡처하고 있다).
@@ -281,8 +293,24 @@ private struct MarkdownWebViewRepresentable: NSViewRepresentable {
 
 /// 마크다운 원문 + 자산 + 테마 CSS를 하나의 HTML 문서로 조립한다.
 enum MarkdownDocument {
+    /// 바뀐 곳 안내 버튼에 쓰는 문구(현재 언어).
+    struct ChangeLabels {
+        /// "{n}" 자리에 개수가 들어간다.
+        var count: String
+        var next: String
+        var dismiss: String
+
+        @MainActor static var current: ChangeLabels {
+            let loc = LocalizationManager.shared
+            return ChangeLabels(count: loc.string(.docChangesCount),
+                                next: loc.string(.docChangesNext),
+                                dismiss: loc.string(.docChangesDismiss))
+        }
+    }
+
     static func html(content: String, fontSize: CGFloat, colors: ColorSet, isDark: Bool,
-                     scrollRatio: Double = 0) -> String {
+                     scrollRatio: Double = 0, previousContent: String? = nil,
+                     changeLabels: ChangeLabels? = nil) -> String {
         // NaN·무한대가 JS 리터럴로 새어 나가면 스크립트 전체가 죽는다.
         let restoreRatio = scrollRatio.isFinite ? min(max(scrollRatio, 0), 1) : 0
         let css = themeCSS(fontSize: fontSize, colors: colors)
@@ -296,6 +324,10 @@ enum MarkdownDocument {
         // 그대로 보존되어야 하며(달러는 수식 구분자), JS 문자열 리터럴로는
         // 이스케이프가 까다롭다. JSON 인코딩이 가장 안전하다.
         let mdJSON = jsonEncoded(content)
+        // 이전 원문이 있으면 바뀐 블록을 칠한다. 없으면 JS 쪽에서 null로 받아 건너뛴다.
+        let prevJSON = previousContent.map(jsonEncoded) ?? "null"
+        let labels = changeLabels ?? ChangeLabels(count: "{n}", next: "", dismiss: "")
+        let labelsJSON = "{count:\(jsonEncoded(labels.count)),next:\(jsonEncoded(labels.next)),dismiss:\(jsonEncoded(labels.dismiss))}"
 
         return """
         <!DOCTYPE html>
@@ -335,13 +367,114 @@ enum MarkdownDocument {
             }, 120);
           }, { passive: true });
 
+          // 이전 원문과 지금 블록 목록을 블록 원문(raw) 단위로 비교한다(LCS).
+          // 지금 목록에서 공통 부분에 들지 못한 블록은 "바뀜", 이전 목록에서 빠진 블록은
+          // 그 자리(지금 목록의 다음 블록 앞)에 "지워짐" 표시를 남긴다.
+          function changedBlocks(prevSource, blocks) {
+            const key = function (t) { return t.raw.trim(); };
+            const a = marked.lexer(prevSource).filter(function (t) { return t.type !== "space"; }).map(key);
+            const b = blocks.map(key);
+            const n = a.length, m = b.length;
+            const result = { changed: new Set(), removedBefore: new Set() };
+            // 아주 긴 문서끼리는 표를 만들지 않는다(n×m). 전부 바뀐 것으로 칠하면 오히려 방해라 생략.
+            if (n * m > 4000000) return result;
+            const dp = Array.from({ length: n + 1 }, function () { return new Uint32Array(m + 1); });
+            for (let i = n - 1; i >= 0; i--)
+              for (let j = m - 1; j >= 0; j--)
+                dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+            let i = 0, j = 0;
+            while (i < n || j < m) {
+              if (i < n && j < m && a[i] === b[j]) { i++; j++; }
+              else if (j < m && (i >= n || dp[i][j + 1] >= dp[i + 1][j])) { result.changed.add(j); j++; }
+              else {
+                result.removedBefore.add(j);
+                i++;
+              }
+            }
+            // 바뀐 블록 바로 앞뒤의 지워짐은 고쳐 쓴 흔적이라 막대 하나로 충분하다.
+            result.removedBefore.forEach(function (j) {
+              if (result.changed.has(j) || result.changed.has(j - 1)) result.removedBefore.delete(j);
+            });
+            return result;
+          }
+
+          function removedMarker() {
+            const d = document.createElement("div");
+            d.className = "mc-removed";
+            return d;
+          }
+
+          // 바뀐 곳 개수 + "다음" 버튼 + 닫기. 다음은 화면 아래쪽의 바뀐 곳으로 차례로 옮겨 가고,
+          // 끝에 닿으면 처음으로 돌아간다. 닫으면 칠도 함께 지운다.
+          function showChangeNavigator(nodes) {
+            const labels = \(labelsJSON);
+            const bar = document.createElement("div");
+            bar.id = "mc-changes";
+            const count = document.createElement("span");
+            count.textContent = labels.count.replace("{n}", String(nodes.length));
+            const next = document.createElement("button");
+            next.textContent = "↓";
+            next.title = labels.next;
+            const close = document.createElement("button");
+            close.textContent = "×";
+            close.title = labels.dismiss;
+            bar.append(count, next, close);
+            let index = -1;
+            next.addEventListener("click", function () {
+              // 지금 보이는 위치 뒤에서 첫 번째 바뀐 곳. 없으면 처음으로.
+              const y = window.pageYOffset + 90;
+              let target = nodes.findIndex(function (n) {
+                return n.getBoundingClientRect().top + window.pageYOffset > y;
+              });
+              if (target < 0 || target === index) target = (index + 1) % nodes.length;
+              index = target;
+              nodes[index].scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+            close.addEventListener("click", function () {
+              document.querySelectorAll(".mc-changed").forEach(function (n) { n.classList.remove("mc-changed"); });
+              document.querySelectorAll(".mc-removed").forEach(function (n) { n.remove(); });
+              bar.remove();
+            });
+            document.body.appendChild(bar);
+          }
+
           (async function () {
             const md = \(mdJSON);
+            const prevMd = \(prevJSON);
             const el = document.getElementById("content");
+            // 바뀐 블록(새로 생기거나 고쳐진 최상위 요소)과 지워진 자리 표시.
+            let changedNodes = [];
             try {
               // 1) 마크다운 → HTML (GFM: 표/체크박스/줄바꿈).
+              //    최상위 블록(문단·제목·목록·표·코드)을 하나씩 HTML로 바꿔 붙인다.
+              //    한 번에 parse한 결과와 같지만, 어느 요소가 어느 블록에서 왔는지 알 수 있어
+              //    이전 원문과 비교해 바뀐 블록만 칠할 수 있다.
               marked.setOptions({ gfm: true, breaks: false });
-              el.innerHTML = marked.parse(md);
+              const tokens = marked.lexer(md);
+              const blocks = tokens.filter(function (t) { return t.type !== "space"; });
+              const changed = prevMd === null ? null : changedBlocks(prevMd, blocks);
+              const tmp = document.createElement("div");
+              blocks.forEach(function (t, i) {
+                if (changed && changed.removedBefore.has(i)) el.appendChild(removedMarker());
+                const one = [t];
+                one.links = tokens.links;
+                tmp.innerHTML = marked.parser(one);
+                const isChanged = changed && changed.changed.has(i);
+                let first = true;
+                while (tmp.firstChild) {
+                  const node = tmp.firstChild;
+                  if (isChanged && node.nodeType === 1) {
+                    node.classList.add("mc-changed");
+                    if (first) { changedNodes.push(node); first = false; }
+                  }
+                  el.appendChild(node);
+                }
+              });
+              if (changed && changed.removedBefore.has(blocks.length)) el.appendChild(removedMarker());
+              changedNodes = changedNodes.concat(Array.from(el.querySelectorAll(".mc-removed")))
+                .sort(function (a, b) {
+                  return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+                });
             } catch (e) {
               report({ error: "marked: " + String(e && e.message ? e.message : e) });
               el.textContent = md; // 최소한 원문이라도 보이게.
@@ -464,6 +597,11 @@ enum MarkdownDocument {
                   const wrap = document.createElement("div");
                   wrap.className = "mermaid-rendered";
                   wrap.innerHTML = svg;
+                  if (pre.classList.contains("mc-changed")) {
+                    wrap.classList.add("mc-changed");
+                    const k = changedNodes.indexOf(pre);
+                    if (k >= 0) changedNodes[k] = wrap;
+                  }
                   pre.replaceWith(wrap);
                 } catch (e) {
                   // 개별 다이어그램 실패는 원본 코드블록을 그대로 두고 넘어간다.
@@ -502,6 +640,10 @@ enum MarkdownDocument {
                 window.scrollTo(0, restore * max);
               }
             }
+
+            // 4-1) 바뀐 곳이 있으면 오른쪽 아래에 개수와 이동 버튼을 띄운다.
+            try { if (changedNodes.length > 0) showChangeNavigator(changedNodes); }
+            catch (e) { report({ error: "changes: " + String(e && e.message ? e.message : e) }); }
 
             // 5) 본문이 완전히 확정됐음을 앱에 알린다. 본문 검색 결과에서 문서를 열면
             //    파일 열기와 ⌘F 검색이 거의 동시에 오는데, 이 신호를 받은 뒤 검색해야
@@ -551,6 +693,7 @@ enum MarkdownDocument {
         let panelBg = colors.panelBackground.hexString
         let selectBg = colors.selectBackground.hexString
         let selectFg = colors.selectForeground.hexString
+        let warning = colors.textWarning.hexString
 
         // 폰트 스택: 시스템 산세리프(한글 포함). 코드/수식은 별도.
         return """
@@ -695,10 +838,64 @@ enum MarkdownDocument {
         #toc a.active { color: \(accent); border-left-color: \(accent); font-weight: 600; }
         #toc::-webkit-scrollbar { width: 6px; }
         #toc::-webkit-scrollbar-thumb { background: \(divider); border-radius: 3px; }
+        /* 다른 앱(AI 도구 등)이 파일을 고쳐 다시 그렸을 때 바뀐 블록과 지워진 자리.
+           왼쪽 막대는 ::before로 본문 여백에 그린다. pre·표는 자체 스크롤이 막대를 잘라 내므로
+           안쪽 그림자로 대신한다. */
+        .mc-changed { position: relative; border-radius: 3px; }
+        .mc-changed:not(pre):not(table) {
+          background-color: \(accent)14;
+          animation: mc-flash 1.6s ease-out;
+        }
+        .mc-changed:not(pre):not(table)::before {
+          content: "";
+          position: absolute;
+          left: -12px; top: 0; bottom: 0;
+          width: 3px;
+          border-radius: 2px;
+          background: \(accent);
+        }
+        pre.mc-changed, table.mc-changed { box-shadow: inset 3px 0 0 \(accent); }
+        @keyframes mc-flash { from { background-color: \(accent)40; } }
+        .mc-removed {
+          height: 0;
+          margin: 8px 0;
+          border-top: 2px dashed \(warning);
+          opacity: 0.7;
+        }
+        #mc-changes {
+          position: fixed;
+          right: 16px;
+          bottom: 16px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 6px 4px 12px;
+          border: 1px solid \(accent);
+          border-radius: 999px;
+          background: \(panelBg);
+          color: \(accent);
+          font-size: 0.8em;
+          font-weight: 600;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+          z-index: 10;
+        }
+        body.has-toc #mc-changes { right: \(tocWidth + 16)px; }
+        #mc-changes button {
+          border: none;
+          background: transparent;
+          color: inherit;
+          font: inherit;
+          cursor: pointer;
+          padding: 2px 6px;
+          border-radius: 999px;
+        }
+        #mc-changes button:hover { background: \(codeInlineBg); }
+
         /* 패널이 좁으면 본문을 살려야 하므로 목차를 접는다. */
         @media (max-width: \(readingWidth + tocWidth + 80)px) {
           #toc { display: none; }
           body.has-toc { padding-right: 0; }
+          body.has-toc #mc-changes { right: 16px; }
         }
         """
     }

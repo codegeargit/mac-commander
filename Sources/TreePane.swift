@@ -27,6 +27,28 @@ final class TreePane: ObservableObject, Identifiable {
     /// 루트 하위에서 외부(Finder 등) 변경이 감지되면 메인 큐에서 호출된다.
     var onExternalChange: ((TreePane) -> Void)?
 
+    /// 최근에 바뀐 항목의 경로 → 바뀐 시각. 바뀐 파일과 그 상위 폴더(루트 제외)가 함께 들어간다.
+    ///
+    /// AI 도구가 폴더 안의 문서를 고치고 나면 "무엇을 건드렸나"가 가장 먼저 궁금하다.
+    /// 트리는 이 기록으로 행 끝에 점을 찍고, 접힌 폴더에도 안에서 무언가 바뀌었다고 알린다.
+    /// FSEvents로 받은 변경만 담으므로, 앱을 켜기 전에 바뀐 파일은 `FileNode.modifiedAt`으로 따로 본다.
+    @Published private(set) var recentChanges: [String: Date] = [:]
+
+    /// "최근 변경"으로 표시하는 기간(초).
+    static let recentChangeWindow: TimeInterval = 10 * 60
+    /// 이 시간이 지나기 전까지는 점을 진하게 칠한다(방금 바뀐 것과 조금 전에 바뀐 것을 가른다).
+    static let freshChangeWindow: TimeInterval = 2 * 60
+
+    /// 기간이 지난 기록을 치우고 점의 진하기를 다시 칠하게 하는 타이머.
+    private var recentChangeTimer: Timer?
+
+    /// 루트가 git 저장소 안이면 그 아래 항목의 git 상태. 저장소가 아니면 비어 있다.
+    @Published private(set) var gitStatus = GitStatusSnapshot()
+    /// 파일이 연달아 바뀔 때 git status를 한 번만 돌리기 위한 지연 작업.
+    private var gitRefreshWork: DispatchWorkItem?
+    /// 늦게 끝난 옛 루트의 결과가 새 루트의 상태를 덮지 않게 하는 세대 번호.
+    private var gitGeneration = 0
+
     /// 루트 하위 트리의 외부 변경 감시자.
     private var directoryWatcher: DirectoryWatcher?
     /// 보안 스코프 접근을 유지 중인 루트 URL(stop을 위해 보관).
@@ -39,6 +61,8 @@ final class TreePane: ObservableObject, Identifiable {
         let node = FileNode(url: url, isDirectory: true)
         node.loadChildrenIfNeeded()
         root = node
+        recentChanges = [:]
+        gitStatus = GitStatusSnapshot()
         expandedURLs = []
         markedURLs = []
         cursorURL = node.children?.first?.url
@@ -238,19 +262,128 @@ final class TreePane: ObservableObject, Identifiable {
         if let c = cursorURL, affected(c) { cursorURL = nil }
     }
 
+    // MARK: - 최근 변경 표시
+
+    /// 이 노드가 최근에 바뀐 지 얼마나 됐는지(초). 최근 변경 기간 밖이면 nil.
+    ///
+    /// 파일은 FSEvents 기록과 디스크의 수정 시각 중 늦은 쪽을 쓴다. 그래야 앱을 켜기 직전에
+    /// AI가 고친 파일도 점이 찍힌다. 폴더의 수정 시각은 바로 아래 항목이 생기거나 지워질 때만
+    /// 바뀌어 안쪽 깊은 변경을 놓치므로, 폴더는 FSEvents 기록만 본다.
+    func recentChangeAge(of node: FileNode, now: Date = Date()) -> TimeInterval? {
+        var changedAt = recentChanges[Self.changeKey(node.url.path)]
+        if !node.isDirectory, node.modifiedAt > (changedAt ?? .distantPast) {
+            changedAt = node.modifiedAt
+        }
+        guard let changedAt else { return nil }
+        let age = now.timeIntervalSince(changedAt)
+        return age < Self.recentChangeWindow ? max(age, 0) : nil
+    }
+
+    /// FSEvents로 받은 경로들을 최근 변경으로 기록한다. 경로의 상위 폴더도 루트 직전까지 함께 남긴다.
+    private func recordChanges(_ paths: [String]) {
+        guard let rootURL = root?.url, !paths.isEmpty else { return }
+        let rootPath = Self.changeKey(rootURL.path)
+        let now = Date()
+        var updated = recentChanges
+        for raw in paths {
+            let path = Self.changeKey(raw)
+            guard path.hasPrefix(rootPath + "/") else { continue }
+            // .git 같은 숨김 항목 아래의 변경은 트리에 보이지 않으니 기록하지 않는다.
+            let relative = path.dropFirst(rootPath.count + 1)
+            if relative.split(separator: "/").contains(where: { $0.hasPrefix(".") }) { continue }
+
+            var current = path
+            while current.count > rootPath.count {
+                updated[current] = now
+                current = (current as NSString).deletingLastPathComponent
+            }
+        }
+        recentChanges = updated
+        scheduleRecentChangeTimer()
+    }
+
+    /// 최근 변경 기록의 키로 쓸 경로. 같은 파일이 /tmp/a와 /private/tmp/a로 섞여 들어오므로
+    /// (FSEvents와 디렉터리 목록은 /private를 붙이고, 사용자가 연 루트는 안 붙일 수 있다)
+    /// /private 아래 시스템 링크 접두사를 떼고, 끝의 "/"도 뗀다.
+    nonisolated static func changeKey(_ path: String) -> String {
+        var p = path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+        for link in ["/private/tmp", "/private/var", "/private/etc"] where p == link || p.hasPrefix(link + "/") {
+            p.removeFirst("/private".count)
+            break
+        }
+        return p
+    }
+
+    /// 기록이 있는 동안만 30초마다 깨어나, 기간이 지난 기록을 지우고 트리를 다시 칠한다.
+    private func scheduleRecentChangeTimer() {
+        guard recentChangeTimer == nil else { return }
+        recentChangeTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.pruneRecentChanges() }
+        }
+    }
+
+    private func pruneRecentChanges() {
+        let cutoff = Date().addingTimeInterval(-Self.recentChangeWindow)
+        let kept = recentChanges.filter { $0.value > cutoff }
+        if kept.count != recentChanges.count { recentChanges = kept }
+        // 진하기(방금 바뀜 → 조금 전 바뀜)와 수정 시각으로 찍은 점도 시간이 지나면 달라지므로 다시 칠한다.
+        objectWillChange.send()
+        if recentChanges.isEmpty && !hasRecentlyModifiedVisibleFile {
+            recentChangeTimer?.invalidate()
+            recentChangeTimer = nil
+        }
+    }
+
+    /// 화면에 보이는 파일 중 수정 시각으로 최근 변경 점이 찍힌 것이 있는지.
+    private var hasRecentlyModifiedVisibleFile: Bool {
+        let cutoff = Date().addingTimeInterval(-Self.recentChangeWindow)
+        return visibleNodes.contains { !$0.isDirectory && $0.modifiedAt > cutoff }
+    }
+
+    // MARK: - git 상태
+
+    func gitStatus(of node: FileNode) -> GitFileStatus? {
+        guard !gitStatus.isEmpty else { return nil }
+        return gitStatus.status(forPath: Self.changeKey(node.url.path), isDirectory: node.isDirectory)
+    }
+
+    /// git 상태를 다시 읽는다. 연달아 불리면 마지막 호출 뒤 잠시 기다렸다 한 번만 돌린다.
+    /// 커밋·스테이징처럼 .git 안만 바뀌는 경우도 FSEvents로 들어오므로 그때도 갱신된다.
+    func scheduleGitRefresh(delay: TimeInterval = 0.6) {
+        gitRefreshWork?.cancel()
+        guard let rootURL = root?.url else { return }
+        gitGeneration += 1
+        let generation = gitGeneration
+        let work = DispatchWorkItem {
+            let snapshot = GitStatusReader.read(root: rootURL) ?? GitStatusSnapshot()
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.gitGeneration == generation else { return }
+                self.gitStatus = snapshot
+            }
+        }
+        gitRefreshWork = work
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
     // MARK: - 외부 변경 감시 (FSEvents)
 
     /// 현재 루트에 대한 파일시스템 감시를 (재)시작한다. root의 didSet에서 호출.
     private func startWatching() {
         directoryWatcher = nil
         guard let rootURL = root?.url else { return }
-        directoryWatcher = DirectoryWatcher(url: rootURL) { [weak self] in
+        directoryWatcher = DirectoryWatcher(url: rootURL) { [weak self] paths in
             guard let self else { return }
+            self.recordChanges(paths)
+            self.scheduleGitRefresh()
             self.onExternalChange?(self)
         }
+        scheduleGitRefresh(delay: 0)
+        // 수정 시각으로 점이 찍힌 파일도 기간이 지나면 지워져야 하므로 타이머를 돌려 둔다.
+        scheduleRecentChangeTimer()
     }
 
     deinit {
         accessedRootURL?.stopAccessingSecurityScopedResource()
+        recentChangeTimer?.invalidate()
     }
 }

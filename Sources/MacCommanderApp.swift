@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 @main
 struct MacCommanderApp: App {
+    /// Finder·독·`mcom` 명령에서 오는 열기 요청을 받는다(ExternalOpen.swift).
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = WorkspaceStore()
     @StateObject private var loc = LocalizationManager.shared
     @StateObject private var theme = ThemeManager.shared
@@ -29,6 +31,10 @@ struct MacCommanderApp: App {
                 .onAppear {
                     store.restoreSession()
                     license.restore()
+                    // 세션 복원 뒤에 연결해야 밖에서 연 폴더가 복원된 폴더에 덮이지 않는다.
+                    ExternalOpenRouter.shared.connect { url in
+                        store.goToPath(url.path)
+                    }
                 }
         }
         .windowStyle(.titleBar)
@@ -59,6 +65,10 @@ struct MacCommanderApp: App {
                 Divider()
                 Button(loc.string(.menuOpenInTerminal)) { store.openInTerminalAtCursor() }
                     .keyboardShortcut("t", modifiers: .command)
+                    .disabled(store.root == nil)
+                // 트리에서는 고른 경로를, 뷰어에서는 선택한 글을 터미널 입력줄로 넘긴다.
+                Button(loc.string(.sendToTerminal)) { store.sendToTerminal() }
+                    .keyboardShortcut(.return, modifiers: [.command, .option])
                     .disabled(store.root == nil)
                 Divider()
                 Button(loc.string(.menuOpenFolder)) { store.promptOpenFolder() }
@@ -187,6 +197,8 @@ struct MacCommanderApp: App {
                     .keyboardShortcut("/", modifiers: .command)
                 Button(loc.string(.fileTypesMenu)) { store.showFileTypes = true }
                 Button(loc.string(.ackMenu)) { store.showAcknowledgements = true }
+                Divider()
+                Button(loc.string(.cliInstallMenu)) { CommandLineToolInstaller.install() }
                 Divider()
                 // 모든 기능이 무료라 막힌 기능에서 후원으로 이어지는 길이 없다. 메뉴에 진입점을 둔다.
                 Button(loc.string(.supportMenu)) { NSWorkspace.shared.open(AppLinks.githubSponsors) }

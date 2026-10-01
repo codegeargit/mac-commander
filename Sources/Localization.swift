@@ -283,6 +283,7 @@ enum L10n {
     case scDelete
     case scOpenFolder
     case scOpenInTerminal
+    case scSendToTerminal
     case scQuickOpen
     case scContentSearch
     case scFind
@@ -348,6 +349,19 @@ enum L10n {
     case statusIPUnavailable     // IP를 못 찾았을 때
     case statusIPCopyHint        // IP 툴팁(클릭하면 복사)
     case statusIPCopied(String)  // IP 복사됨 알림
+
+    // MARK: 최근 변경 · git
+    case recentChangeHelp(Int)   // 트리의 최근 변경 점 툴팁(몇 분 전)
+    case docChangesCount         // 뷰어: 다시 읽은 문서에서 바뀐 곳 개수("{n}"이 개수 자리)
+    case docChangesNext          // 뷰어: 다음 바뀐 곳으로
+    case docChangesDismiss       // 뷰어: 바뀐 곳 표시 지우기
+
+    // MARK: 명령줄 도구
+    case sendToTerminal          // 터미널 입력줄로 경로·선택 글 보내기(⌥⌘↩)
+    case cliInstallMenu          // 도움말 메뉴: 명령줄 도구 설치
+    case cliInstallTitle         // 설치 결과 알림 제목
+    case cliInstalled(String)    // 설치 완료(링크 경로)
+    case cliInstallFailed(String) // 설치 실패(이유)
 
     /// 동사(이동/복사) — moveFailed/copyFailed에 쓰임.
     func value(for lang: AppLanguage) -> String {
@@ -622,6 +636,7 @@ enum L10n {
         case .scDelete:         ko = "삭제(휴지통)"; en = "Delete (Trash)"
         case .scOpenFolder:     ko = "폴더 열기"; en = "Open Folder"
         case .scOpenInTerminal: ko = "시스템 터미널에서 열기"; en = "Open in System Terminal"
+        case .scSendToTerminal: ko = "고른 경로·선택한 글을 터미널 입력줄로 보내기"; en = "Send selected paths or text to the terminal prompt"
         case .scQuickOpen:      ko = "파일 빠른 열기"; en = "Quick Open File"
         case .scContentSearch:  ko = "폴더에서 본문 찾기"; en = "Find Text in Folder"
         case .scFind:           ko = "문서에서 찾기"; en = "Find in Document"
@@ -700,6 +715,22 @@ enum L10n {
         case .statusIPUnavailable: ko = "IP 없음"; en = "No IP"
         case .statusIPCopyHint:    ko = "클릭하면 IP 주소를 복사합니다"; en = "Click to copy IP address"
         case .statusIPCopied(let ip): ko = "IP 복사됨: \(ip)"; en = "IP copied: \(ip)"
+
+        case .recentChangeHelp(let minutes):
+            ko = minutes < 1 ? "방금 바뀜" : "\(minutes)분 전에 바뀜"
+            en = minutes < 1 ? "Changed just now" : "Changed \(minutes) min ago"
+        case .docChangesCount:     ko = "바뀐 곳 {n}"; en = "{n} changed"
+        case .docChangesNext:      ko = "다음 바뀐 곳으로"; en = "Next change"
+        case .docChangesDismiss:   ko = "표시 지우기"; en = "Clear highlights"
+
+        case .sendToTerminal:      ko = "터미널로 보내기"; en = "Send to Terminal"
+        case .cliInstallMenu:      ko = "명령줄 도구(mcom) 설치…"; en = "Install Command Line Tool (mcom)…"
+        case .cliInstallTitle:     ko = "명령줄 도구"; en = "Command Line Tool"
+        case .cliInstalled(let path):
+            ko = "\(path) 에 설치했습니다.\n\n터미널에서 mcom 을 치면 지금 폴더가 열리고, mcom plan.md 처럼 파일을 주면 그 문서가 바로 뜹니다."
+            en = "Installed at \(path).\n\nRun mcom in Terminal to open the current folder, or mcom plan.md to open that document."
+        case .cliInstallFailed(let reason):
+            ko = "설치하지 못했습니다: \(reason)"; en = "Could not install: \(reason)"
         }
         return lang == .korean ? ko : en
     }

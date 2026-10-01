@@ -352,6 +352,19 @@ final class WorkspaceStore: ObservableObject {
     /// TerminalView가 화면에 올라온 뒤 자신을 등록하고, 사라지면 nil로 지운다.
     var terminalCommandSink: ((String) -> Void)?
 
+    /// 실행 중인 터미널 입력줄에 텍스트를 넣는(Enter 없이) 콜백. "터미널로 보내기"(TerminalSend.swift)가 쓴다.
+    /// 터미널이 닫혀 있을 때 보낸 글은 터미널을 연 뒤 이 콜백이 등록되면 넣는다.
+    var terminalInsertSink: ((String) -> Void)? {
+        didSet {
+            guard let sink = terminalInsertSink, let text = pendingTerminalInsert else { return }
+            pendingTerminalInsert = nil
+            // 셸 프로필이 다 읽히고 프롬프트가 뜬 뒤에 넣어야 입력이 지워지지 않는다.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { sink(text) }
+        }
+    }
+    /// 터미널이 열리기를 기다리는 "터미널로 보내기" 글.
+    var pendingTerminalInsert: String?
+
     /// Claude Code를 임베디드 터미널에서 실행한다.
     /// `--permission-mode auto`로 시작해 Shift+Tab 없이 처음부터 자동 수락 모드가 켜진다.
     /// 터미널이 이미 열려 있으면 실행 중인 셸에 바로 명령을 주입하고,

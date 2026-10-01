@@ -31,6 +31,11 @@ targets:
     platform: macOS
     sources:
       - path: Sources
+        excludes:
+          - Resources/mcom
+      # 확장자가 없는 셸 스크립트는 xcodegen이 리소스로 알아보지 못해 따로 지정한다.
+      - path: Sources/Resources/mcom
+        buildPhase: resources
     dependencies:
       - package: MarkdownUI
         product: MarkdownUI
@@ -58,6 +63,33 @@ targets:
         CFBundleShortVersionString: "1.14.2"
         CFBundleVersion: "26"
         LSMinimumSystemVersion: "14.0"
+        # Finder의 "다음으로 열기"에 마크다운 문서와 폴더용으로 나오게 한다.
+        # Alternate라 사용자가 고르기 전에는 기본 앱 자리를 빼앗지 않는다.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown Document
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - net.daringfireball.markdown
+          - CFBundleTypeName: Folder
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.folder
+        # 마크다운 UTI를 선언하지 않은 환경에서도 .md를 알아보게 가져온다(시스템 선언이 있으면 그쪽이 우선).
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: net.daringfireball.markdown
+            UTTypeDescription: Markdown Document
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - md
+                - markdown
+                - mdown
+                - mkd
+              public.mime-type:
+                - text/markdown
         NSHumanReadableCopyright: "© 2026 CodeGear"
         # Sparkle 자동 업데이트 설정.
         # appcast는 공개 배포 리포(mac-commander-releases)의 최신 릴리스 자산으로 호스팅.

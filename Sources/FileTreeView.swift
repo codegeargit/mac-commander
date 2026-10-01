@@ -113,7 +113,9 @@ struct FileTreeView: View {
                                 treeHasFocus: hasTreeFocus,
                                 // 같은 파일이 두 트리에 다 보여도 편집 칸은 작업 중인 트리에만 뜬다.
                                 isRenaming: store.renamingURL == node.url && store.activePane === pane,
-                                isDropTarget: dropTargetURL != nil && dropTargetURL == dropFolder(for: node)
+                                isDropTarget: dropTargetURL != nil && dropTargetURL == dropFolder(for: node),
+                                changeAge: pane.recentChangeAge(of: node),
+                                gitStatus: pane.gitStatus(of: node)
                             )
                             .id(node.url)
                             // 탭 제스처는 하나만 둔다: .onTapGesture(count: 2)를 따로 붙이면
@@ -164,6 +166,7 @@ struct FileTreeView: View {
                                 Button(loc.string(.newFolder)) { activate(); store.createFolder(near: node) }
                                 Divider()
                                 Button(loc.string(.openInTerminal)) { store.openInTerminal(near: node) }
+                                Button(loc.string(.sendToTerminal)) { activate(); store.sendPathsToTerminal(for: node, in: pane) }
                                 Divider()
                                 Button(loc.string(.copyPath)) { store.copyPath(node.url) }
                                 Button(loc.string(.copyRelativePath)) { activate(); store.copyRelativePath(node.url) }
@@ -371,6 +374,7 @@ struct SortMenuItems: View {
 /// 트리의 한 행.
 private struct FileTreeRow: View {
     @EnvironmentObject private var store: WorkspaceStore
+    @EnvironmentObject private var loc: LocalizationManager
     @EnvironmentObject private var theme: ThemeManager
     let node: FileNode
     let depth: Int
@@ -383,6 +387,10 @@ private struct FileTreeRow: View {
     let treeHasFocus: Bool
     let isRenaming: Bool
     let isDropTarget: Bool
+    /// 최근에 바뀐 지 몇 초 됐는지. 최근 변경이 아니면 nil.
+    let changeAge: TimeInterval?
+    /// git 상태(저장소 밖이거나 바뀐 것이 없으면 nil).
+    let gitStatus: GitFileStatus?
 
     @State private var draftName: String = ""
     @FocusState private var fieldFocused: Bool
@@ -435,6 +443,16 @@ private struct FileTreeRow: View {
             }
 
             Spacer(minLength: 0)
+
+            if let gitStatus, !node.isDirectory, !isRenaming {
+                Text(gitStatus.letter)
+                    .font(.system(size: store.treeFontSize * 0.85, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(isSelected ? Palette.selectForeground : Self.color(for: gitStatus))
+            }
+
+            if let changeAge, !isRenaming {
+                recentChangeDot(age: changeAge)
+            }
         }
         .padding(.horizontal, 6)
         .frame(height: store.treeRowHeight)
@@ -452,6 +470,25 @@ private struct FileTreeRow: View {
             }
         }
         .contentShape(Rectangle())
+    }
+
+    /// 최근 변경 표시 점. 방금 바뀐 것은 진하게, 조금 지난 것은 흐리게 칠한다.
+    /// 폴더는 안쪽 어딘가가 바뀌었다는 뜻이라 속이 빈 원으로 그려 파일과 구분한다.
+    private func recentChangeDot(age: TimeInterval) -> some View {
+        let fresh = age < TreePane.freshChangeWindow
+        let color = isSelected ? Palette.selectForeground : Palette.accent
+        let size = store.treeFontSize * 0.5
+        return Group {
+            if node.isDirectory {
+                Circle().strokeBorder(color, lineWidth: 1.2)
+            } else {
+                Circle().fill(color)
+            }
+        }
+        .frame(width: size, height: size)
+        .opacity(fresh ? 1 : 0.45)
+        .padding(.trailing, 2)
+        .help(loc.string(.recentChangeHelp(Int(age / 60))))
     }
 
     /// 인라인 편집 시작 시 포커스를 확실히 잡고, 편집 필드의 텍스트를 전체 선택한다.
@@ -496,9 +533,20 @@ private struct FileTreeRow: View {
         return node.isViewable ? Palette.accentDim : Palette.textMuted
     }
 
+    /// git 상태 색. 수정은 경고색, 새 파일은 강조색, 충돌·삭제는 빨강.
+    static func color(for status: GitFileStatus) -> Color {
+        switch status {
+        case .untracked, .added: return Palette.accent
+        case .modified, .renamed: return Palette.textWarning
+        case .deleted, .conflicted: return Color(nsColor: .systemRed)
+        }
+    }
+
     private var textColor: Color {
         if isSelected { return Palette.selectForeground }
         if isMarked { return Palette.accent }   // 선택 항목은 강조색(TC 느낌)
+        // git으로 바뀐 항목은 이름을 상태 색으로 칠한다(폴더는 안쪽에서 가장 강한 상태).
+        if let gitStatus { return Self.color(for: gitStatus) }
         if node.isDirectory { return Palette.textFolder }
         return node.isViewable ? Palette.textPrimary : Palette.textMuted // 비-뷰어 파일은 흐리게
     }

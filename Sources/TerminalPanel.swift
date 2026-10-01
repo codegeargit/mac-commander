@@ -79,6 +79,20 @@ final class CommanderTerminalView: LocalProcessTerminalView {
         send(Array(text.utf8))
     }
 
+    /// 텍스트를 입력줄에 넣기만 한다(Enter는 누르지 않는다). 사용자가 뒤에 지시를 이어 쓰게.
+    ///
+    /// 셸(zsh)과 Claude Code는 bracketed paste를 켜 두므로, 그 표시로 감싸 보내면 여러 줄도
+    /// 한 덩어리 붙여넣기로 받아 줄마다 실행하지 않는다. 그 모드가 꺼진 프로그램에는 줄바꿈이
+    /// Enter가 되므로 공백으로 바꿔 한 줄로 보낸다.
+    func insertForPrompt(_ text: String) {
+        if terminal.bracketedPasteMode {
+            send(txt: "\u{1b}[200~" + text + "\u{1b}[201~")
+        } else {
+            send(txt: text.replacingOccurrences(of: "\n", with: " "))
+        }
+        window?.makeFirstResponder(self)
+    }
+
     /// 모니터는 앱 전체 키 입력을 보므로, 실제로 이 터미널이
     /// 키 입력을 받는 상태일 때만 가로채도록 확인한다.
     private var hasKeyboardFocus: Bool {
@@ -104,6 +118,8 @@ struct TerminalView: NSViewRepresentable {
     /// 실행 중인 셸에 명령을 즉시 주입하는 콜백을 등록/해제한다.
     /// (터미널이 이미 열린 상태에서 Claude 버튼을 눌렀을 때 사용)
     var onSinkReady: ((((String) -> Void)?) -> Void) = { _ in }
+    /// 입력줄에 텍스트를 넣기만 하는(Enter 없이) 콜백을 등록/해제한다. "터미널로 보내기"용.
+    var onInsertSinkReady: ((((String) -> Void)?) -> Void) = { _ in }
     /// 앱 테마에 맞춘 터미널 배경/전경/커서 색. 테마가 바뀌면 값이 갱신돼 재적용된다.
     var themeColors: (background: NSColor, foreground: NSColor, cursor: NSColor)
     /// 터미널 글자 크기(pt). ⌘+/⌘- 또는 ⌘+휠로 바뀌면 값이 갱신돼 재적용된다.
@@ -127,8 +143,12 @@ struct TerminalView: NSViewRepresentable {
             view?.send(txt: command + "\n")
             view?.window?.makeFirstResponder(view)
         }
+        onInsertSinkReady { [weak view] text in view?.insertForPrompt(text) }
         // 뷰가 사라지면 sink를 해제(nil 등록)하도록 예약.
-        context.coordinator.onDismantle = { onSinkReady(nil) }
+        context.coordinator.onDismantle = {
+            onSinkReady(nil)
+            onInsertSinkReady(nil)
+        }
 
         // 뷰가 window에 붙은 뒤 키보드 포커스를 터미널로 넘긴다.
         // (makeNSView 시점에는 아직 window가 없어 다음 런루프로 미룬다)
@@ -244,6 +264,7 @@ struct TerminalPanel: View {
                 autoCommand: store.pendingTerminalCommand,
                 onCommandConsumed: { store.pendingTerminalCommand = nil },
                 onSinkReady: { store.terminalCommandSink = $0 },
+                onInsertSinkReady: { store.terminalInsertSink = $0 },
                 themeColors: theme.terminalColors,
                 fontSize: store.terminalFontSize
             )
