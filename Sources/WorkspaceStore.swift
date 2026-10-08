@@ -1028,6 +1028,16 @@ final class WorkspaceStore: ObservableObject {
         viewerScrollRatios[url] = min(max(ratio, 0), 1)
     }
 
+    /// HTML 문서별 주소 해시(`#3`). 프레젠테이션형 HTML은 지금 페이지를 스크롤이 아니라
+    /// 해시에 적어 두므로, 다른 파일을 보고 돌아왔을 때 같은 페이지로 열기 위해 기억한다.
+    private var viewerFragments: [URL: String] = [:]
+
+    func viewerFragment(for url: URL) -> String? { viewerFragments[url] }
+
+    func setViewerFragment(_ fragment: String?, for url: URL) {
+        viewerFragments[url] = fragment?.isEmpty == false ? fragment : nil
+    }
+
     /// 서식 문서를 QuickLook으로 보겠다고 사용자가 고른 문서들.
     ///
     /// 두 렌더러가 서로 다른 방식으로 어긋난다. 변환 PDF는 표 폭·글꼴이 정확한 대신

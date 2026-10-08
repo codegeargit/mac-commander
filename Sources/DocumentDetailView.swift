@@ -71,6 +71,15 @@ struct DocumentDetailView: View {
                             findRequest: panel.findRequest,
                             onFindResult: { found in
                                 store.reportFindResult(found: found, panel: panelIndex)
+                            },
+                            // 읽던 위치는 마크다운과 같은 저장소에 문서별로 기억한다.
+                            scrollRatio: { store.viewerScrollRatio(for: $0) },
+                            onScroll: { ratio, url in
+                                Task { @MainActor in store.setViewerScrollRatio(ratio, for: url) }
+                            },
+                            fragment: { store.viewerFragment(for: $0) },
+                            onFragment: { fragment, url in
+                                Task { @MainActor in store.setViewerFragment(fragment, for: url) }
                             })
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Palette.viewerBackground)
