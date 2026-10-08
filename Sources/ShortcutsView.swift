@@ -21,6 +21,7 @@ struct ShortcutsView: View {
     private var categories: [Category] {
         [
             Category(title: .scCategoryFile, rows: [
+                Row(keys: "⌥⌘N", desc: .menuNewWindow),
                 Row(keys: "⌘N", desc: .scNewFile),
                 Row(keys: "⇧⌘N", desc: .scNewFolder),
                 Row(keys: "⌘⌫", desc: .scDelete),

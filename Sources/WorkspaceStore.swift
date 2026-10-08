@@ -141,12 +141,12 @@ final class WorkspaceStore: ObservableObject {
 
     /// 두 번째 트리를 보여 주는지(Total Commander식 듀얼 모드).
     @Published private(set) var isDualPane: Bool = false {
-        didSet { defaults.set(isDualPane, forKey: Key.dualPane) }
+        didSet { if isSessionOwner { defaults.set(isDualPane, forKey: Key.dualPane) } }
     }
 
     /// 키 입력·파일 작업이 향하는 트리(0 또는 1). 듀얼 모드가 아니면 늘 0번을 쓴다.
     @Published private(set) var activePaneIndex: Int = 0 {
-        didSet { defaults.set(activePaneIndex, forKey: Key.activeTreePane) }
+        didSet { if isSessionOwner { defaults.set(activePaneIndex, forKey: Key.activeTreePane) } }
     }
 
     /// 지금 작업 대상인 트리.
@@ -435,6 +435,8 @@ final class WorkspaceStore: ObservableObject {
             panes.forEach { $0.rescanAll() }
             // 인덱스 범위(표시 필터)가 달라졌으니 검색도 다시 훑어야 한다.
             fileIndex.markStale()
+            // FileNode의 표시 필터는 앱 전체가 함께 쓴다. 다른 창의 트리도 맞춘다.
+            for other in Self.otherStores(than: self) { other.showAllFiles = showAllFiles }
         }
     }
 
@@ -446,6 +448,7 @@ final class WorkspaceStore: ObservableObject {
             defaults.set(sortOrder.field.rawValue, forKey: Key.sortField)
             defaults.set(sortOrder.ascending, forKey: Key.sortAscending)
             panes.forEach { $0.rescanAll() }
+            for other in Self.otherStores(than: self) { other.sortOrder = sortOrder }
         }
     }
 
@@ -650,6 +653,8 @@ final class WorkspaceStore: ObservableObject {
         }
         restoreFailure = nil
         pane.setRoot(url)
+        // 폴더를 연 창이 지금 쓰는 창이다. 다음 실행 때 이 창을 되살린다.
+        claimSession()
 
         // 기본 트리에서 새 작업 폴더를 열면 뷰어도 새로 시작한다.
         // 두 번째 트리는 옆 폴더를 잠깐 들여다보는 용도라 열린 문서를 건드리지 않는다.
@@ -2272,6 +2277,15 @@ final class WorkspaceStore: ObservableObject {
 
     /// 앱 시작 시 호출: 저장된 폰트 크기, 루트 북마크, 마지막 파일을 복원한다.
     func restoreSession() {
+        restorePreferences()
+
+        // 첫 실행이면 복원할 것이 없다. 환영 화면이 뜬다(실패가 아니므로 안내도 없다).
+        guard let data = defaults.data(forKey: Key.rootBookmark) else { return }
+        restoreWorkspace(fromBookmark: data)
+    }
+
+    /// 글자 크기·패널 크기·필터·정렬 같은 환경 값을 불러온다. 새 창도 이 값으로 시작한다.
+    private func restorePreferences() {
         if defaults.object(forKey: Key.fontSize) != nil {
             setFont(CGFloat(defaults.double(forKey: Key.fontSize)))
         }
@@ -2325,10 +2339,10 @@ final class WorkspaceStore: ObservableObject {
         }
 
         loadRecentFolders()
+    }
 
-        // 첫 실행이면 복원할 것이 없다. 환영 화면이 뜬다(실패가 아니므로 안내도 없다).
-        guard let data = defaults.data(forKey: Key.rootBookmark) else { return }
-
+    /// 지난 세션의 트리 폴더와 열린 파일을 되살린다.
+    private func restoreWorkspace(fromBookmark data: Data) {
         // 아래 복원 실패들은 예전에는 조용히 빠져나가 빈 화면만 남겼다.
         // 폴더가 지워졌거나 옮겨졌거나 권한을 잃은 것이니 사용자에게 알려야 한다.
         var isStale = false
@@ -2446,10 +2460,92 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
+    // MARK: - 여러 창
+
+    /// 창마다 스토어가 하나씩 있다. 열려 있는 창의 스토어들(약한 참조).
+    private static var windowStores: [WeakStore] = []
+    private struct WeakStore { weak var store: WorkspaceStore? }
+
+    /// 세션(트리 폴더·열린 파일)을 저장하는 창. 마지막으로 쓴 창이 맡는다.
+    /// 창마다 따로 저장하면 서로 덮어써 다음 실행 때 두 창의 상태가 뒤섞인다.
+    private static weak var sessionOwner: WorkspaceStore?
+    /// 이번 실행에서 저장된 세션을 되살린 창. 이 창이 처음 세션을 맡을 때는 다시 쓸 것이 없다.
+    private static weak var sessionRestorer: WorkspaceStore?
+    private static var sessionClaimed = false
+    /// 새 창이 처음 열 폴더(새 창 명령을 내린 창의 폴더). 새 창이 뜨면서 가져간다.
+    private static var pendingNewWindowFolder: URL?
+
+    /// 마지막으로 키 창이 됐던 창의 스토어. Finder·`mcom`에서 온 열기 요청은 이 창이 받는다.
+    private(set) static weak var lastActive: WorkspaceStore?
+
+    private var isSessionOwner: Bool { Self.sessionOwner === self }
+
+    private static func otherStores(than store: WorkspaceStore) -> [WorkspaceStore] {
+        windowStores.compactMap(\.store).filter { $0 !== store }
+    }
+
+    /// 창이 뜰 때 한 번 호출한다.
+    /// - 새 창 명령으로 뜬 창: 명령을 내린 창의 폴더로 시작한다.
+    /// - 앱의 첫 창: 지난 세션(마지막으로 쓴 창의 상태)을 되살린다.
+    /// - macOS가 함께 되살린 나머지 창: 환경 값만 가지고 시작 화면(최근 폴더)으로 뜬다.
+    func windowDidAppear() {
+        let isFirstWindow = Self.windowStores.compactMap(\.store).isEmpty
+        if !Self.windowStores.contains(where: { $0.store === self }) {
+            Self.windowStores.append(WeakStore(store: self))
+        }
+        if Self.lastActive == nil { Self.lastActive = self }
+
+        if let folder = Self.pendingNewWindowFolder {
+            Self.pendingNewWindowFolder = nil
+            restorePreferences()
+            openFolder(folder)
+            return
+        }
+        if isFirstWindow {
+            Self.sessionRestorer = self
+            restoreSession()
+        } else {
+            restorePreferences()
+        }
+    }
+
+    /// 창이 닫힐 때 호출한다. 세션을 맡고 있었다면 다음에 쓰는 창이 넘겨받는다.
+    func windowDidClose() {
+        Self.windowStores.removeAll { $0.store == nil || $0.store === self }
+        if isSessionOwner { Self.sessionOwner = nil }
+        if Self.lastActive === self { Self.lastActive = Self.windowStores.last?.store }
+    }
+
+    /// 창이 키 창이 되면 호출한다.
+    func windowDidBecomeKey() {
+        Self.lastActive = self
+        claimSession()
+    }
+
+    /// 이 창이 세션을 맡는다. 폴더가 열린 창만 맡는다(환영 화면 창이 세션을 지우지 않게).
+    /// 세션을 되살린 창이 처음 맡을 때 말고는 이 창의 상태를 통째로 저장해 앞 창의 흔적을 지운다.
+    private func claimSession() {
+        guard !isSessionOwner, primaryPane.root != nil else { return }
+        let continuesRestored = !Self.sessionClaimed && self === Self.sessionRestorer
+        Self.sessionOwner = self
+        Self.sessionClaimed = true
+        guard !continuesRestored else { return }
+        defaults.set(isDualPane, forKey: Key.dualPane)
+        defaults.set(activePaneIndex, forKey: Key.activeTreePane)
+        panes.forEach { saveRootBookmark(for: $0) }
+        persistOpenedFiles()
+    }
+
+    /// 새 창을 열기 직전에 부른다(⌥⌘N). 새 창은 이 창의 활성 트리 폴더에서 시작한다.
+    func prepareNewWindow() {
+        Self.pendingNewWindowFolder = activePane.root?.url
+    }
+
     // MARK: - 북마크 / 정리
 
     /// 현재 패널들의 파일 경로와 활성 인덱스, 폭 비율을 저장.
     private func persistOpenedFiles() {
+        guard isSessionOwner else { return }
         let paths = panels.map { $0.fileURL?.path ?? "" }
         defaults.set(paths, forKey: Key.openedFiles)
         defaults.set(activePanelIndex, forKey: Key.activePanel)
@@ -2457,12 +2553,13 @@ final class WorkspaceStore: ObservableObject {
     }
 
     private func persistWeights() {
+        guard isSessionOwner else { return }
         defaults.set(panelWeights.map { Double($0) }, forKey: Key.panelWeights)
     }
 
     /// 트리의 루트 폴더를 북마크로 저장한다. 왼쪽(0번) 자리와 오른쪽(1번) 자리를 따로 기억한다.
     private func saveRootBookmark(for pane: TreePane) {
-        guard let url = pane.root?.url,
+        guard isSessionOwner, let url = pane.root?.url,
               let index = panes.firstIndex(where: { $0 === pane }),
               let data = try? url.bookmarkData(
                 options: [.withSecurityScope],

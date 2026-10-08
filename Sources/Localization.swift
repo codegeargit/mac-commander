@@ -136,6 +136,7 @@ enum L10n {
     case menuFocusNext
     case menuFocusPrevious
     case menuOpenFolder
+    case menuNewWindow
     case menuToggleEdit
     case menuSave
     case menuOpenInTerminal
@@ -471,6 +472,7 @@ enum L10n {
         case .menuFocusNext:    ko = "다음 영역으로"; en = "Focus Next Area"
         case .menuFocusPrevious: ko = "이전 영역으로"; en = "Focus Previous Area"
         case .menuOpenFolder:   ko = "폴더 열기…"; en = "Open Folder…"
+        case .menuNewWindow:    ko = "새 창"; en = "New Window"
         case .menuToggleEdit:   ko = "편집/미리보기 전환"; en = "Toggle Edit/Preview"
         case .menuSave:         ko = "저장"; en = "Save"
         case .menuOpenInTerminal: ko = "터미널에서 열기"; en = "Open in Terminal"

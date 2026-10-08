@@ -6,206 +6,26 @@ import UniformTypeIdentifiers
 struct MacCommanderApp: App {
     /// Finder·독·`mcom` 명령에서 오는 열기 요청을 받는다(ExternalOpen.swift).
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var store = WorkspaceStore()
     @StateObject private var loc = LocalizationManager.shared
     @StateObject private var theme = ThemeManager.shared
     @StateObject private var license = LicenseManager.shared
     @StateObject private var updater = UpdaterManager()
-    @Environment(\.colorScheme) private var systemScheme
-
-    /// F5·F6을 쓸 수 있는지. 듀얼 모드에서는 보내는 쪽이 활성 트리가 아닐 수도 있어 따로 따진다.
-    private var canCopyOrMove: Bool {
-        store.isDualPane
-            ? store.transferSourcePaneIndex() != nil
-            : store.cursorURL != nil || store.markedCount > 0
-    }
 
     var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .environmentObject(store)
+        // 창마다 자기 스토어(트리·뷰어·터미널 상태)를 가진다(WorkspaceWindow).
+        WindowGroup(id: WorkspaceWindow.sceneID) {
+            WorkspaceWindow()
                 .environmentObject(loc)
                 .environmentObject(theme)
                 .environmentObject(license)
                 .preferredColorScheme(theme.preferredColorScheme)
-                .onAppear {
-                    store.restoreSession()
-                    license.restore()
-                    // 세션 복원 뒤에 연결해야 밖에서 연 폴더가 복원된 폴더에 덮이지 않는다.
-                    ExternalOpenRouter.shared.connect { url in
-                        store.goToPath(url.path)
-                    }
-                }
         }
+        // Finder·`mcom`에서 온 열기 요청으로 창을 새로 만들지 않는다. AppDelegate가 받아 앞 창에서 연다.
+        .handlesExternalEvents(matching: [])
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
-            // 앱 메뉴의 "MacCommander 정보": 표준 About 패널에 만든이 크레딧을 얹어서 띄운다.
-            CommandGroup(replacing: .appInfo) {
-                Button(loc.string(.menuAbout)) { showAboutPanel() }
-            }
-            CommandGroup(replacing: .newItem) {
-                Button(loc.string(.newMarkdownFile)) { store.createMarkdownFileAtCursor() }
-                    .keyboardShortcut("n", modifiers: .command)
-                    .disabled(store.root == nil)
-                Button(loc.string(.newFolder)) { store.createFolderAtCursor() }
-                    .keyboardShortcut("n", modifiers: [.command, .shift])
-                    .disabled(store.root == nil)
-                Divider()
-                Button(loc.string(.delete)) { store.requestDeleteAtCursor() }
-                    .keyboardShortcut(.delete, modifiers: .command)
-                    .disabled(store.cursorURL == nil)
-                Divider()
-                Button(loc.string(.menuToggleEdit)) { store.toggleEditingActivePanel() }
-                    .keyboardShortcut("e", modifiers: .command)
-                    .disabled(store.selectedURL == nil)
-                Button(loc.string(.menuSave)) { store.saveActivePanel() }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .disabled(!(store.panels[safe: store.activePanelIndex]?.isDirty ?? false))
-                Divider()
-                Button(loc.string(.menuOpenInTerminal)) { store.openInTerminalAtCursor() }
-                    .keyboardShortcut("t", modifiers: .command)
-                    .disabled(store.root == nil)
-                // 트리에서는 고른 경로를, 뷰어에서는 선택한 글을 터미널 입력줄로 넘긴다.
-                Button(loc.string(.sendToTerminal)) { store.sendToTerminal() }
-                    .keyboardShortcut(.return, modifiers: [.command, .option])
-                    .disabled(store.root == nil)
-                Divider()
-                Button(loc.string(.menuOpenFolder)) { store.promptOpenFolder() }
-                    .keyboardShortcut("o", modifiers: .command)
-                Button(loc.string(.goToFolder)) { store.promptGoToFolder() }
-                    .keyboardShortcut("g", modifiers: [.command, .shift])
-                    .disabled(store.root == nil)
-                Button(loc.string(.menuQuickOpen)) { store.openQuickOpen() }
-                    .keyboardShortcut("p", modifiers: .command)
-                    .disabled(store.root == nil)
-            }
-            // 인쇄 기능이 없다. 메뉴에서 빼서 ⌘P를 빠른 열기에 온전히 넘긴다.
-            CommandGroup(replacing: .printItem) {}
-            // 찾기는 macOS 관례대로 편집 메뉴(붙여넣기 다음)에 둔다.
-            CommandGroup(after: .pasteboard) {
-                Divider()
-                Button(loc.string(.menuFind)) { store.openFind() }
-                    .keyboardShortcut("f", modifiers: .command)
-                    .disabled(!store.canFindInActivePanel)
-                Button(loc.string(.menuFindNext)) { store.findNextInActivePanel() }
-                    .keyboardShortcut("g", modifiers: .command)
-                    .disabled(!store.canFindInActivePanel)
-                Button(loc.string(.menuContentSearch)) { store.openContentSearch() }
-                    .keyboardShortcut("f", modifiers: [.command, .shift])
-                    .disabled(store.root == nil)
-            }
-            // Function Key 단축키 (Total Commander 스타일).
-            // 메뉴 커맨드로 등록해 포커스(first responder) 위치와 무관하게 항상 동작.
-            CommandMenu(loc.string(.menuCommands)) {
-                Button("F3 · \(loc.string(.fkeyView))") { store.fkeyView() }
-                    .keyboardShortcut(KeyEquivalent("\u{F706}"), modifiers: [])
-                    .disabled(store.root == nil)
-                Button("F4 · \(loc.string(.fkeyEdit))") { store.fkeyEdit() }
-                    .keyboardShortcut(KeyEquivalent("\u{F707}"), modifiers: [])
-                    .disabled(store.root == nil)
-                // 듀얼 모드에서는 Total Commander처럼 F5·F6이 반대편 트리로 복사·이동한다.
-                Button("F5 · \(loc.string(store.isDualPane ? .fkeyCopyToOther : .fkeyCopy))") {
-                    store.fkeyCopyAtCursor()
-                }
-                .keyboardShortcut(KeyEquivalent("\u{F708}"), modifiers: [])
-                .disabled(!canCopyOrMove)
-                Button("F6 · \(loc.string(store.isDualPane ? .fkeyMoveToOther : .fkeyRename))") {
-                    store.fkeyRenameAtCursor()
-                }
-                .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: [])
-                .disabled(!canCopyOrMove)
-                if store.isDualPane {
-                    // F6이 이동이 되므로 제자리 이름 변경은 ⇧F6으로 옮긴다(원작과 같다).
-                    Button("⇧F6 · \(loc.string(.fkeyRename))") { store.fkeyRenameInPlace() }
-                        .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: [.shift])
-                        .disabled(store.cursorURL == nil)
-                }
-                Button("F7 · \(loc.string(.fkeyNewFolder))") { store.createFolderAtCursor() }
-                    .keyboardShortcut(KeyEquivalent("\u{F70A}"), modifiers: [])
-                    .disabled(store.root == nil)
-                Button("F8 · \(loc.string(.fkeyDelete))") { store.requestDeleteAtCursor() }
-                    .keyboardShortcut(KeyEquivalent("\u{F70B}"), modifiers: [])
-                    .disabled(store.cursorURL == nil)
-                Divider()
-                Button(loc.string(.mrtMenu)) { store.openMultiRename() }
-                    .keyboardShortcut("r", modifiers: .command)
-                    .disabled(store.cursorURL == nil && store.markedCount == 0)
-            }
-            // 보기 메뉴: 폰트 크기 / 패널 / 포커스 / 상위 폴더
-            CommandGroup(after: .toolbar) {
-                Button(loc.string(.menuFontLarger)) { store.increaseFont() }
-                    .keyboardShortcut("+", modifiers: .command)  // ⌘+ (= 키 + Shift)
-                Button(loc.string(.menuFontSmaller)) { store.decreaseFont() }
-                    .keyboardShortcut("-", modifiers: .command)
-                Button(loc.string(.menuFontDefault)) { store.resetFont() }
-                    .keyboardShortcut("0", modifiers: .command)
-                Divider()
-                Button(loc.string(.toggleTerminal)) { store.toggleTerminal() }
-                    .keyboardShortcut("`", modifiers: .control)
-                Button(loc.string(store.terminalPosition == .bottom
-                                  ? .terminalMoveRight : .terminalMoveBottom)) {
-                    store.toggleTerminalPosition()
-                }
-                .disabled(!store.showTerminal)
-                Divider()
-                Button(loc.string(.menuAddPanel)) { store.addPanel() }
-                    .keyboardShortcut("+", modifiers: [.command, .control])
-                    .disabled(!store.canAddPanel)
-                Button(loc.string(.menuRemovePanel)) { store.removeActivePanel() }
-                    .keyboardShortcut("-", modifiers: [.command, .control])
-                    .disabled(!store.canRemovePanel)
-                Divider()
-                // 두 번째 트리(Total Commander식 듀얼 모드)
-                Button(loc.string(store.isDualPane ? .menuCloseSecondTree : .menuOpenSecondTree)) {
-                    store.toggleDualPane()
-                }
-                .keyboardShortcut("d", modifiers: [.command, .shift])
-                .disabled(store.primaryPane.root == nil)
-                Button(loc.string(.menuSwapTrees)) { store.swapPanes() }
-                    .keyboardShortcut("u", modifiers: .control)
-                    .disabled(!store.isDualPane)
-                // 커서 위치를 다른 트리에서도 연다(원작의 Ctrl+←/→). 화살표 방향으로 보낸다.
-                Button(loc.string(.menuSameLocationRight)) { store.showSameLocation(inPane: 1) }
-                    .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
-                    .disabled(store.primaryPane.root == nil)
-                Button(loc.string(.menuSameLocationLeft)) { store.showSameLocation(inPane: 0) }
-                    .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
-                    .disabled(!store.isDualPane)
-                Divider()
-                Button(loc.string(.menuFocusNext)) { store.focusNext() }
-                    .keyboardShortcut(.tab, modifiers: [])
-                Button(loc.string(.menuFocusPrevious)) { store.focusPrevious() }
-                    .keyboardShortcut(.tab, modifiers: [.shift])
-                Divider()
-                Menu(loc.string(.sortMenu)) {
-                    SortMenuItems()
-                        .environmentObject(store)
-                        .environmentObject(loc)
-                }
-                .disabled(store.root == nil)
-                Divider()
-                Button(loc.string(.goToParent)) { store.goToParent() }
-                    .keyboardShortcut(.upArrow, modifiers: .command)
-                    .disabled(!store.canGoToParent)
-                Divider()
-            }
-            SidebarCommands()
-            // Help 메뉴: 키보드 단축키 + 지원 파일 형식 + 오픈소스 고지 + 후원 + 업데이트 확인.
-            CommandGroup(replacing: .help) {
-                Button(loc.string(.shortcutsMenu)) { store.showShortcuts = true }
-                    .keyboardShortcut("/", modifiers: .command)
-                Button(loc.string(.fileTypesMenu)) { store.showFileTypes = true }
-                Button(loc.string(.ackMenu)) { store.showAcknowledgements = true }
-                Divider()
-                Button(loc.string(.cliInstallMenu)) { CommandLineToolInstaller.install() }
-                Divider()
-                // 모든 기능이 무료라 막힌 기능에서 후원으로 이어지는 길이 없다. 메뉴에 진입점을 둔다.
-                Button(loc.string(.supportMenu)) { NSWorkspace.shared.open(AppLinks.githubSponsors) }
-                Divider()
-                CheckForUpdatesView(updater: updater.updater,
-                                    title: loc.string(.menuCheckForUpdates))
-            }
+            MainCommands(loc: loc, license: license, updater: updater)
         }
 
         // 환경설정 창 (⌘,)
@@ -214,6 +34,240 @@ struct MacCommanderApp: App {
                 .environmentObject(loc)
                 .environmentObject(theme)
                 .environmentObject(license)
+        }
+    }
+}
+
+/// 창 하나. 창마다 스토어를 따로 두어 서로 다른 폴더를 볼 수 있다.
+struct WorkspaceWindow: View {
+    static let sceneID = "workspace"
+
+    @StateObject private var store = WorkspaceStore()
+    @EnvironmentObject private var license: LicenseManager
+    @Environment(\.controlActiveState) private var activeState
+    /// 앱 전체에서 한 번만 할 일(후원 키 확인, 외부 열기 연결)을 했는지.
+    private static var didLaunch = false
+
+    var body: some View {
+        ContentView()
+            .environmentObject(store)
+            // 메뉴 명령은 지금 앞에 있는 창의 스토어로 간다(MainCommands).
+            .focusedSceneObject(store)
+            // 창이 여럿이면 제목(윈도 메뉴·미션 컨트롤)으로 구분한다.
+            .navigationTitle(store.primaryPane.root?.url.lastPathComponent ?? "Mac Commander")
+            .onAppear {
+                store.windowDidAppear()
+                if activeState == .key { store.windowDidBecomeKey() }
+                guard !Self.didLaunch else { return }
+                Self.didLaunch = true
+                license.restore()
+                // 세션 복원 뒤에 연결해야 밖에서 연 폴더가 복원된 폴더에 덮이지 않는다.
+                // 요청은 마지막으로 쓴 창이 받는다.
+                ExternalOpenRouter.shared.connect { url in
+                    WorkspaceStore.lastActive?.goToPath(url.path)
+                }
+            }
+            .onDisappear { store.windowDidClose() }
+            .onChange(of: activeState) { _, state in
+                if state == .key { store.windowDidBecomeKey() }
+            }
+    }
+}
+
+/// 메뉴 막대 명령. 앞에 있는 창의 스토어에 보낸다.
+struct MainCommands: Commands {
+    @ObservedObject var loc: LocalizationManager
+    @ObservedObject var license: LicenseManager
+    let updater: UpdaterManager
+    @FocusedObject private var focusedStore: WorkspaceStore?
+    @Environment(\.openWindow) private var openWindow
+
+    /// 앞에 창이 없을 때(설정 창만 떠 있거나 창을 다 닫았을 때) 쓰는 빈 스토어.
+    /// 폴더가 없으니 폴더가 필요한 명령은 모두 꺼진다.
+    @MainActor private static let noWindowStore = WorkspaceStore()
+    private var store: WorkspaceStore { focusedStore ?? Self.noWindowStore }
+
+    /// F5·F6을 쓸 수 있는지. 듀얼 모드에서는 보내는 쪽이 활성 트리가 아닐 수도 있어 따로 따진다.
+    private var canCopyOrMove: Bool {
+        store.isDualPane
+            ? store.transferSourcePaneIndex() != nil
+            : store.cursorURL != nil || store.markedCount > 0
+    }
+
+    var body: some Commands {
+        // 앱 메뉴의 "MacCommander 정보": 표준 About 패널에 만든이 크레딧을 얹어서 띄운다.
+        CommandGroup(replacing: .appInfo) {
+            Button(loc.string(.menuAbout)) { showAboutPanel() }
+        }
+        CommandGroup(replacing: .newItem) {
+            // 창마다 따로 폴더를 연다. 새 창은 지금 창의 폴더에서 시작한다.
+            Button(loc.string(.menuNewWindow)) {
+                focusedStore?.prepareNewWindow()
+                openWindow(id: WorkspaceWindow.sceneID)
+            }
+            .keyboardShortcut("n", modifiers: [.command, .option])
+            Divider()
+            Button(loc.string(.newMarkdownFile)) { store.createMarkdownFileAtCursor() }
+                .keyboardShortcut("n", modifiers: .command)
+                .disabled(store.root == nil)
+            Button(loc.string(.newFolder)) { store.createFolderAtCursor() }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+                .disabled(store.root == nil)
+            Divider()
+            Button(loc.string(.delete)) { store.requestDeleteAtCursor() }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(store.cursorURL == nil)
+            Divider()
+            Button(loc.string(.menuToggleEdit)) { store.toggleEditingActivePanel() }
+                .keyboardShortcut("e", modifiers: .command)
+                .disabled(store.selectedURL == nil)
+            Button(loc.string(.menuSave)) { store.saveActivePanel() }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(!(store.panels[safe: store.activePanelIndex]?.isDirty ?? false))
+            Divider()
+            Button(loc.string(.menuOpenInTerminal)) { store.openInTerminalAtCursor() }
+                .keyboardShortcut("t", modifiers: .command)
+                .disabled(store.root == nil)
+            // 트리에서는 고른 경로를, 뷰어에서는 선택한 글을 터미널 입력줄로 넘긴다.
+            Button(loc.string(.sendToTerminal)) { store.sendToTerminal() }
+                .keyboardShortcut(.return, modifiers: [.command, .option])
+                .disabled(store.root == nil)
+            Divider()
+            Button(loc.string(.menuOpenFolder)) { store.promptOpenFolder() }
+                .keyboardShortcut("o", modifiers: .command)
+                .disabled(focusedStore == nil)
+            Button(loc.string(.goToFolder)) { store.promptGoToFolder() }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+                .disabled(store.root == nil)
+            Button(loc.string(.menuQuickOpen)) { store.openQuickOpen() }
+                .keyboardShortcut("p", modifiers: .command)
+                .disabled(store.root == nil)
+        }
+        // 인쇄 기능이 없다. 메뉴에서 빼서 ⌘P를 빠른 열기에 온전히 넘긴다.
+        CommandGroup(replacing: .printItem) {}
+        // 찾기는 macOS 관례대로 편집 메뉴(붙여넣기 다음)에 둔다.
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button(loc.string(.menuFind)) { store.openFind() }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(!store.canFindInActivePanel)
+            Button(loc.string(.menuFindNext)) { store.findNextInActivePanel() }
+                .keyboardShortcut("g", modifiers: .command)
+                .disabled(!store.canFindInActivePanel)
+            Button(loc.string(.menuContentSearch)) { store.openContentSearch() }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(store.root == nil)
+        }
+        // Function Key 단축키 (Total Commander 스타일).
+        // 메뉴 커맨드로 등록해 포커스(first responder) 위치와 무관하게 항상 동작.
+        CommandMenu(loc.string(.menuCommands)) {
+            Button("F3 · \(loc.string(.fkeyView))") { store.fkeyView() }
+                .keyboardShortcut(KeyEquivalent("\u{F706}"), modifiers: [])
+                .disabled(store.root == nil)
+            Button("F4 · \(loc.string(.fkeyEdit))") { store.fkeyEdit() }
+                .keyboardShortcut(KeyEquivalent("\u{F707}"), modifiers: [])
+                .disabled(store.root == nil)
+            // 듀얼 모드에서는 Total Commander처럼 F5·F6이 반대편 트리로 복사·이동한다.
+            Button("F5 · \(loc.string(store.isDualPane ? .fkeyCopyToOther : .fkeyCopy))") {
+                store.fkeyCopyAtCursor()
+            }
+            .keyboardShortcut(KeyEquivalent("\u{F708}"), modifiers: [])
+            .disabled(!canCopyOrMove)
+            Button("F6 · \(loc.string(store.isDualPane ? .fkeyMoveToOther : .fkeyRename))") {
+                store.fkeyRenameAtCursor()
+            }
+            .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: [])
+            .disabled(!canCopyOrMove)
+            if store.isDualPane {
+                // F6이 이동이 되므로 제자리 이름 변경은 ⇧F6으로 옮긴다(원작과 같다).
+                Button("⇧F6 · \(loc.string(.fkeyRename))") { store.fkeyRenameInPlace() }
+                    .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: [.shift])
+                    .disabled(store.cursorURL == nil)
+            }
+            Button("F7 · \(loc.string(.fkeyNewFolder))") { store.createFolderAtCursor() }
+                .keyboardShortcut(KeyEquivalent("\u{F70A}"), modifiers: [])
+                .disabled(store.root == nil)
+            Button("F8 · \(loc.string(.fkeyDelete))") { store.requestDeleteAtCursor() }
+                .keyboardShortcut(KeyEquivalent("\u{F70B}"), modifiers: [])
+                .disabled(store.cursorURL == nil)
+            Divider()
+            Button(loc.string(.mrtMenu)) { store.openMultiRename() }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(store.cursorURL == nil && store.markedCount == 0)
+        }
+        // 보기 메뉴: 폰트 크기 / 패널 / 포커스 / 상위 폴더
+        CommandGroup(after: .toolbar) {
+            Button(loc.string(.menuFontLarger)) { store.increaseFont() }
+                .keyboardShortcut("+", modifiers: .command)  // ⌘+ (= 키 + Shift)
+            Button(loc.string(.menuFontSmaller)) { store.decreaseFont() }
+                .keyboardShortcut("-", modifiers: .command)
+            Button(loc.string(.menuFontDefault)) { store.resetFont() }
+                .keyboardShortcut("0", modifiers: .command)
+            Divider()
+            Button(loc.string(.toggleTerminal)) { store.toggleTerminal() }
+                .keyboardShortcut("`", modifiers: .control)
+            Button(loc.string(store.terminalPosition == .bottom
+                              ? .terminalMoveRight : .terminalMoveBottom)) {
+                store.toggleTerminalPosition()
+            }
+            .disabled(!store.showTerminal)
+            Divider()
+            Button(loc.string(.menuAddPanel)) { store.addPanel() }
+                .keyboardShortcut("+", modifiers: [.command, .control])
+                .disabled(!store.canAddPanel)
+            Button(loc.string(.menuRemovePanel)) { store.removeActivePanel() }
+                .keyboardShortcut("-", modifiers: [.command, .control])
+                .disabled(!store.canRemovePanel)
+            Divider()
+            // 두 번째 트리(Total Commander식 듀얼 모드)
+            Button(loc.string(store.isDualPane ? .menuCloseSecondTree : .menuOpenSecondTree)) {
+                store.toggleDualPane()
+            }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
+            .disabled(store.primaryPane.root == nil)
+            Button(loc.string(.menuSwapTrees)) { store.swapPanes() }
+                .keyboardShortcut("u", modifiers: .control)
+                .disabled(!store.isDualPane)
+            // 커서 위치를 다른 트리에서도 연다(원작의 Ctrl+←/→). 화살표 방향으로 보낸다.
+            Button(loc.string(.menuSameLocationRight)) { store.showSameLocation(inPane: 1) }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .disabled(store.primaryPane.root == nil)
+            Button(loc.string(.menuSameLocationLeft)) { store.showSameLocation(inPane: 0) }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                .disabled(!store.isDualPane)
+            Divider()
+            Button(loc.string(.menuFocusNext)) { store.focusNext() }
+                .keyboardShortcut(.tab, modifiers: [])
+            Button(loc.string(.menuFocusPrevious)) { store.focusPrevious() }
+                .keyboardShortcut(.tab, modifiers: [.shift])
+            Divider()
+            Menu(loc.string(.sortMenu)) {
+                SortMenuItems()
+                    .environmentObject(store)
+                    .environmentObject(loc)
+            }
+            .disabled(store.root == nil)
+            Divider()
+            Button(loc.string(.goToParent)) { store.goToParent() }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+                .disabled(!store.canGoToParent)
+            Divider()
+        }
+        SidebarCommands()
+        // Help 메뉴: 키보드 단축키 + 지원 파일 형식 + 오픈소스 고지 + 후원 + 업데이트 확인.
+        CommandGroup(replacing: .help) {
+            Button(loc.string(.shortcutsMenu)) { store.showShortcuts = true }
+                .keyboardShortcut("/", modifiers: .command)
+            Button(loc.string(.fileTypesMenu)) { store.showFileTypes = true }
+            Button(loc.string(.ackMenu)) { store.showAcknowledgements = true }
+            Divider()
+            Button(loc.string(.cliInstallMenu)) { CommandLineToolInstaller.install() }
+            Divider()
+            // 모든 기능이 무료라 막힌 기능에서 후원으로 이어지는 길이 없다. 메뉴에 진입점을 둔다.
+            Button(loc.string(.supportMenu)) { NSWorkspace.shared.open(AppLinks.githubSponsors) }
+            Divider()
+            CheckForUpdatesView(updater: updater.updater,
+                                title: loc.string(.menuCheckForUpdates))
         }
     }
 
